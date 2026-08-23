@@ -768,6 +768,12 @@ textarea {
   font-size: 12px;
 }
 
+.integration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .integration-state {
   flex: 0 0 auto;
   min-height: 24px;

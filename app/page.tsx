@@ -1022,16 +1022,19 @@ function IntegrationCards({
 }) {
   const [results, setResults] = useState<Record<string, IntegrationTestState>>({});
 
-  const testIntegration = async (integration: IntegrationCatalogItem) => {
+  const testIntegration = async (
+    integration: IntegrationCatalogItem,
+    options: { mode: "shape" | "live"; path?: string } = { mode: "shape", path: integration.testPath }
+  ) => {
     setResults((current) => ({
       ...current,
       [integration.id]: {
-        message: "Testing",
+        message: options.mode === "live" ? "Live test" : "Testing",
         status: "testing"
       }
     }));
 
-    if (!integration.testPath) {
+    if (!options.path) {
       const result = {
         message: "Not configured",
         status: "error" as const,
@@ -1039,19 +1042,21 @@ function IntegrationCards({
       };
       setResults((current) => ({ ...current, [integration.id]: result }));
       onNotice("Not configured");
-      onAddActivity(`${integration.name} test skipped: not configured`);
+      onAddActivity(`${integration.name} ${options.mode} test skipped: not configured`);
       return;
     }
 
     try {
-      const response = await fetch(integration.testPath);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
+      const response = await fetch(options.path);
       const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? `HTTP ${response.status}`);
+
       const count = Array.isArray(payload.observations)
         ? payload.observations.length
         : Array.isArray(payload.snapshot?.people)
           ? payload.snapshot.people.length
+          : typeof payload.count === "number"
+            ? payload.count
           : 0;
       const result = {
         message: `${count} records`,
@@ -1060,7 +1065,7 @@ function IntegrationCards({
       };
       setResults((current) => ({ ...current, [integration.id]: result }));
       onNotice("Integration tested");
-      onAddActivity(`${integration.name} test returned ${count} records`);
+      onAddActivity(`${integration.name} ${options.mode} test returned ${count} records`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Request failed";
       setResults((current) => ({
@@ -1072,7 +1077,7 @@ function IntegrationCards({
         }
       }));
       onNotice("Test failed");
-      onAddActivity(`${integration.name} test failed: ${message}`);
+      onAddActivity(`${integration.name} ${options.mode} test failed: ${message}`);
     }
   };
 
@@ -1097,10 +1102,22 @@ function IntegrationCards({
                 </div>
                 <span className={`integration-state ${result.status}`}>{result.message}</span>
               </div>
-              <button className="text-button" onClick={() => testIntegration(integration)} title={`Test ${integration.name}`}>
-                <Check size={17} />
-                Test
-              </button>
+              <div className="integration-actions">
+                <button className="text-button" onClick={() => testIntegration(integration)} title={`Test ${integration.name}`}>
+                  <Check size={17} />
+                  Test
+                </button>
+                {integration.liveTestPath ? (
+                  <button
+                    className="text-button"
+                    onClick={() => testIntegration(integration, { mode: "live", path: integration.liveTestPath })}
+                    title={`Live test ${integration.name}`}
+                  >
+                    <Activity size={17} />
+                    Live
+                  </button>
+                ) : null}
+              </div>
             </div>
           );
         })}

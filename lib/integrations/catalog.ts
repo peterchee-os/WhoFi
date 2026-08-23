@@ -6,6 +6,7 @@ export type IntegrationCatalogItem = {
   category: IntegrationCategory;
   description: string;
   id: string;
+  liveTestPath?: string;
   name: string;
   status: IntegrationStatus;
   testPath?: string;
@@ -31,6 +32,7 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
     category: "Network",
     description: "Cloud-managed clients and usage data",
     id: "network-meraki",
+    liveTestPath: "/api/observations/meraki/test",
     name: "Cisco Meraki",
     status: "shape_ready",
     testPath: "/api/observations/meraki/shape"
