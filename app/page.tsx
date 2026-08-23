@@ -24,6 +24,7 @@ import {
 import { StatusBadge } from "@/components/StatusBadge";
 import { demoAlerts, demoDevices, demoProfiles } from "@/lib/demo-data";
 import { formatBytes, formatRelativeTime, percent } from "@/lib/format";
+import { integrationCatalog, type IntegrationCatalogItem } from "@/lib/integrations/catalog";
 import type { Alert, AlertStatus, Device, DeviceStatus, Profile, RiskState } from "@/lib/types";
 
 type View = "dashboard" | "devices" | "profiles" | "alerts" | "settings";
@@ -1000,56 +1001,7 @@ function IntegrationCards({
 }) {
   const [results, setResults] = useState<Record<string, IntegrationTestState>>({});
 
-  const integrations = [
-    {
-      category: "Network",
-      description: "Demo observations endpoint",
-      id: "network-demo",
-      name: "Demo Network",
-      testPath: "/api/observations/demo"
-    },
-    {
-      category: "Network",
-      description: "Controller client and usage data",
-      id: "network-omada",
-      name: "Omada"
-    },
-    {
-      category: "Identity",
-      description: "Demo profile snapshot endpoint",
-      id: "identity-demo",
-      name: "Demo Identity",
-      testPath: "/api/profiles/demo"
-    },
-    {
-      category: "Identity",
-      description: "Property/customer entitlement source",
-      id: "identity-yardi",
-      name: "Yardi"
-    },
-    {
-      category: "Identity",
-      description: "Coworking member and company source",
-      id: "identity-officernd",
-      name: "OfficeRnD"
-    },
-    {
-      category: "Identity",
-      description: "Coworking member, plan, and usage source",
-      id: "identity-deskworks",
-      name: "Deskworks",
-      testPath: "/api/profiles/deskworks/shape"
-    },
-    {
-      category: "Identity",
-      description: "API-first member and location source",
-      id: "identity-nexudus",
-      name: "Nexudus",
-      testPath: "/api/profiles/nexudus/shape"
-    }
-  ];
-
-  const testIntegration = async (integration: typeof integrations[number]) => {
+  const testIntegration = async (integration: IntegrationCatalogItem) => {
     setResults((current) => ({
       ...current,
       [integration.id]: {
@@ -1113,14 +1065,14 @@ function IntegrationCards({
         <Wifi size={20} color="var(--teal-dark)" />
       </div>
       <div className="integration-list">
-        {integrations.map((integration) => {
+        {integrationCatalog.map((integration) => {
           const result = results[integration.id] ?? { message: "Not tested", status: "idle" as const };
           return (
             <div className="integration-item" key={integration.id}>
               <div className="integration-title">
                 <div>
                   <strong>{integration.name}</strong>
-                  <span>{integration.category} · {integration.description}</span>
+                  <span>{integration.category} · {integration.description} · {formatIntegrationStatus(integration.status)}</span>
                 </div>
                 <span className={`integration-state ${result.status}`}>{result.message}</span>
               </div>
@@ -1134,6 +1086,12 @@ function IntegrationCards({
       </div>
     </section>
   );
+}
+
+function formatIntegrationStatus(status: IntegrationCatalogItem["status"]) {
+  if (status === "demo") return "demo";
+  if (status === "shape_ready") return "shape ready";
+  return "planned";
 }
 
 function DeviceLedger({
