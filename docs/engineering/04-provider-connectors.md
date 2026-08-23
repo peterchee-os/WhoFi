@@ -198,6 +198,7 @@ Current implementation state:
 - demo-safe shape endpoint exists at `/api/observations/meraki/shape`
 - server-side live test endpoint exists at `/api/observations/meraki/test`
 - Settings integration card can test the normalized output shape
+- live test route is not exposed in the UI until provider config exists for both Omada and Meraki
 - live Meraki API client scaffolding exists for read-only client observations
 - no production sync scheduler yet
 
