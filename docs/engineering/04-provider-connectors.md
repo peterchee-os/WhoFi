@@ -150,7 +150,7 @@ Responsibilities:
 - list sites
 - list access points
 - list current clients
-- collect MAC, IP, hostname, SSID, AP, site, traffic counters, first/last seen when available
+- collect client MAC, IP, hostname, SSID, AP name, AP/BSSID MAC, site, traffic counters, first/last seen when available
 - collect authentication/accounting events later if Omada/RADIUS configuration exposes them
 - optionally authorize captive portal clients
 - optionally block/quarantine clients later
@@ -207,6 +207,7 @@ Current browser recon notes:
 - Live shell probe with the 1Password credentials confirmed `/{controllerId}/api/v2/login` succeeds and returns an Omada token.
 - Calling OpenAPI endpoints with an ordinary Bearer token returned Omada authorization failures (`401` / `-44116`). The connector should mimic the console's session headers rather than treating OpenAPI as a plain Bearer-token API.
 - After matching the HAR convention, a private live test against the Seattle Essentials site returned current active client observations through WhoFi's normalized Omada route.
+- Active-client rows distinguish the client MAC from the AP/BSSID MAC. When validating a known workstation that is "connected to" an AP, the visible Omada value may be the AP/BSSID (`apMac`) rather than the workstation's own client MAC. WhoFi verification anchors therefore support both `client` and `access_point` modes.
 - Related actions exist for block/unblock/delete client and past connection/portal-auth history, but MVP should stay read-only.
 
 Expected server-side config:
@@ -218,6 +219,9 @@ Expected server-side config:
 - `OMADA_SITE_ID`: selected site id, such as Seattle or Redmond once mapped.
 - `OMADA_SITE_NAME`: optional display name for operator clarity.
 - `OMADA_USERNAME` and `OMADA_PASSWORD`: server-side credentials or secret references for the TP-Link/Omada account.
+- `WHOFI_VERIFICATION_ANCHOR_KIND`: optional smoke-test anchor mode, `client` or `access_point`.
+- `WHOFI_VERIFICATION_CLIENT_MAC`: optional known client MAC or AP/BSSID MAC used only for presence checks.
+- `WHOFI_VERIFICATION_CLIENT_LABEL`: optional display label for the smoke-test anchor.
 
 Credential note:
 

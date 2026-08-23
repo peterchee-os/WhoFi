@@ -161,6 +161,8 @@ Status:
 - Bad-site-id live negative path is scripted and fails cleanly at the active-client endpoint without emitting observations.
 - Connectivity/timeout live negative path is scripted with a short configurable timeout and fails cleanly at login without emitting observations.
 - Private extension registration now uses the generated CLI's `registerNovelCommand` hook instead of editing generated root command wiring directly.
+- Private CLI patch now carries `apMac` in normalized observations so WhoFi can verify either a client MAC or an AP/BSSID MAC. This matters because "connected to AP" diagnostics may identify the AP/BSSID, not the client device MAC.
+- 2026-08-23 local rebuild of the private CLI hit an unrelated `github.com/enetx/http2` / Go 1.27 stdlib mismatch; keep the patch, but re-run Go tests/build after the toolchain or dependency version is corrected.
 
 ## Phase 5: Decide Runtime Integration
 

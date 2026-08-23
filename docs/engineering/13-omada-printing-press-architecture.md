@@ -221,6 +221,7 @@ The Omada CLI emits WhoFi-ready observations:
   "ip": "redacted-or-real-at-runtime",
   "hostname": "device name",
   "ssid": "network name",
+  "apMac": "redacted-or-real-at-runtime",
   "apName": "access point name",
   "rxBytes": 0,
   "txBytes": 0,
@@ -229,6 +230,8 @@ The Omada CLI emits WhoFi-ready observations:
   "raw": {}
 }
 ```
+
+`mac` is the client/device MAC. `apMac` is the access point or BSSID MAC reported with the client row. Keep them separate because operator-visible WiFi diagnostics often show the AP/BSSID a workstation is connected to, not the workstation's own client MAC.
 
 The CLI may also expose raw controller output for diagnostics, but WhoFi should consume normalized output by default. The private spike now omits raw payloads by default and requires an explicit raw-output flag for diagnostics. Any raw output mode should be opt-in and should not be used in public fixtures or docs.
 
