@@ -25,6 +25,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(buildDemoDeviceSnapshot(verificationOptions));
     }
 
+    if (!liveDeviceSourcesEnabled()) {
+      return NextResponse.json(
+        {
+          error: "Live device sources are disabled",
+          source
+        },
+        {
+          status: 403
+        }
+      );
+    }
+
     if (source === "omada") {
       const client = getOmadaClientFromEnv();
       const observations = await listOmadaObservations(client, {
@@ -57,6 +69,10 @@ function readSource(request: NextRequest): DeviceSource {
   const value = request.nextUrl.searchParams.get("source");
   if (value === "omada" || value === "omada-pp") return value;
   return "demo";
+}
+
+function liveDeviceSourcesEnabled() {
+  return process.env.WHOFI_ENABLE_LIVE_DEVICE_SOURCES === "true";
 }
 
 function redactDeviceSourceError(value: string) {

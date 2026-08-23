@@ -55,6 +55,8 @@ For personal devices, do not infer application/process identity. A laptop with t
 
 Email notifications should avoid raw MAC addresses in subject lines and should not send guest/customer emails until templates, consent, and recipient rules are explicit.
 
+Live device sources must be explicitly enabled with `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true`. Keep that flag false for public demos and any deployment that does not yet have admin authentication or equivalent operator access control.
+
 ## Secret Handling
 
 Config files may reference environment variable names. They must not contain secret values.

@@ -219,6 +219,7 @@ Expected server-side config:
 - `OMADA_SITE_ID`: selected site id, such as Seattle or Redmond once mapped.
 - `OMADA_SITE_NAME`: optional display name for operator clarity.
 - `OMADA_USERNAME` and `OMADA_PASSWORD`: server-side credentials or secret references for the TP-Link/Omada account.
+- `WHOFI_ENABLE_LIVE_DEVICE_SOURCES`: must be `true` before live device snapshots return rows.
 - `WHOFI_VERIFICATION_ANCHOR_KIND`: optional smoke-test anchor mode, `client` or `access_point`.
 - `WHOFI_VERIFICATION_CLIENT_MAC`: optional known client MAC or AP/BSSID MAC used only for presence checks.
 - `WHOFI_VERIFICATION_CLIENT_LABEL`: optional display label for the smoke-test anchor.

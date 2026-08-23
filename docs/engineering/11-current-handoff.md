@@ -21,6 +21,7 @@ Latest completed slices:
 - activity log for review actions
 - safe Omada CLI doctor route that returns readiness checks only
 - optional verification anchor support for client MAC or AP/BSSID MAC smoke tests
+- live device snapshot gate via `WHOFI_ENABLE_LIVE_DEVICE_SOURCES`
 
 The UI intentionally avoids visible product-mode tabs such as event/coworking/home. The product can support those contexts internally, but the operator experience should stay focused on who and what is on the WiFi.
 
@@ -82,13 +83,12 @@ If port `3000` is already in use, use the next available port and tell Peter the
 Recommended next slice:
 
 ```text
-Protect live network snapshots behind app authentication or an explicit deployment gate
+Add app-level admin authentication before hosted live-network use
 ```
 
-The demo app now has explicit live-source buttons, and `/api/devices?source=omada` / `source=omada-pp` can return real MAC/IP/hostname data when configured. Before exposing a hosted deployment against real tenant WiFi, add one of:
+The demo app now has explicit live-source buttons, and `/api/devices?source=omada` / `source=omada-pp` can return real MAC/IP/hostname data only when `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true`. Before exposing a hosted deployment against real tenant WiFi, add:
 
 - app-level admin authentication
-- deployment env gate for live device source endpoints
 - tenant/operator access control around provider config
 
 Keep demo mode public-safe. Live source responses include client network identifiers and must not be exposed unauthenticated.
@@ -107,7 +107,7 @@ Do not start with:
 
 Next practical order:
 
-1. Protect/gate live network snapshot endpoints.
+1. Add app-level admin authentication.
 2. Demo data cleanup and responsive pass.
 3. Lightweight in-memory/server-side provider interface for notifications.
 4. Persisted database schema.
