@@ -23,6 +23,11 @@ import { formatBytes, formatRelativeTime, percent } from "@/lib/format";
 import type { Device, DeviceStatus, Profile, RiskState } from "@/lib/types";
 
 type View = "dashboard" | "devices" | "profiles" | "alerts";
+type ReviewState = {
+  profileOverrides: Record<string, string | undefined>;
+  riskOverrides: Record<string, RiskState>;
+  statusOverrides: Record<string, DeviceStatus>;
+};
 
 const navItems: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: "dashboard", label: "Dashboard", icon: Gauge },
@@ -32,6 +37,7 @@ const navItems: Array<{ id: View; label: string; icon: LucideIcon }> = [
 ];
 
 const openAlerts = demoAlerts.filter((alert) => alert.status === "open").length;
+const reviewStateKey = "whofi.demo.reviewState";
 
 const profileById = new Map(demoProfiles.map((profile) => [profile.id, profile]));
 const ownerMix = [
@@ -67,6 +73,41 @@ export default function Home() {
   const [profileOverrides, setProfileOverrides] = useState<Record<string, string | undefined>>({});
   const [statusOverrides, setStatusOverrides] = useState<Record<string, DeviceStatus>>({});
   const [riskOverrides, setRiskOverrides] = useState<Record<string, RiskState>>({});
+  const [stateLoaded, setStateLoaded] = useState(false);
+  const [notice, setNotice] = useState("Ready");
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(reviewStateKey);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as Partial<ReviewState>;
+        setProfileOverrides(parsed.profileOverrides ?? {});
+        setRiskOverrides(parsed.riskOverrides ?? {});
+        setStatusOverrides(parsed.statusOverrides ?? {});
+      } catch {
+        window.localStorage.removeItem(reviewStateKey);
+      }
+    }
+    setStateLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!stateLoaded) return;
+
+    const nextState: ReviewState = {
+      profileOverrides,
+      riskOverrides,
+      statusOverrides
+    };
+    window.localStorage.setItem(reviewStateKey, JSON.stringify(nextState));
+  }, [profileOverrides, riskOverrides, stateLoaded, statusOverrides]);
+
+  useEffect(() => {
+    if (!notice || notice === "Ready") return;
+
+    const timeout = window.setTimeout(() => setNotice("Ready"), 2200);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
 
   const devices = useMemo(() => {
     return demoDevices.map((device) => ({
@@ -108,15 +149,48 @@ export default function Home() {
   const assignDevice = (deviceId: string, profileId: string) => {
     setProfileOverrides((current) => ({ ...current, [deviceId]: profileId }));
     setStatusOverrides((current) => ({ ...current, [deviceId]: "claimed" }));
+    setNotice("Owner assigned");
   };
 
   const setDeviceRisk = (deviceId: string, riskState: RiskState) => {
     setRiskOverrides((current) => ({ ...current, [deviceId]: riskState }));
+    setNotice(riskState === "normal" ? "Marked reviewed" : "Device updated");
   };
 
   const blockDevice = (deviceId: string) => {
     setStatusOverrides((current) => ({ ...current, [deviceId]: "revoked" }));
     setRiskOverrides((current) => ({ ...current, [deviceId]: "needs_review" }));
+    setNotice("Device blocked");
+  };
+
+  const resetDemoState = () => {
+    setProfileOverrides({});
+    setRiskOverrides({});
+    setStatusOverrides({});
+    window.localStorage.removeItem(reviewStateKey);
+    setNotice("Reset complete");
+  };
+
+  const exportSnapshot = () => {
+    const payload = {
+      alerts: demoAlerts,
+      devices,
+      exportedAt: new Date().toISOString(),
+      profiles: demoProfiles,
+      reviewState: {
+        profileOverrides,
+        riskOverrides,
+        statusOverrides
+      }
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `whofi-snapshot-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setNotice("Snapshot exported");
   };
 
   return (
@@ -169,10 +243,11 @@ export default function Home() {
                 value={query}
               />
             </label>
-            <button className="icon-button" title="Refresh">
+            <span className="notice-pill">{notice}</span>
+            <button className="icon-button" onClick={resetDemoState} title="Reset">
               <RefreshCcw size={18} />
             </button>
-            <button className="text-button" title="Export">
+            <button className="text-button" onClick={exportSnapshot} title="Export">
               <Download size={18} />
               Export
             </button>

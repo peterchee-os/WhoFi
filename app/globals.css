@@ -177,6 +177,19 @@ select {
   color: var(--ink);
 }
 
+.notice-pill {
+  min-height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .icon-button,
 .text-button {
   min-height: 38px;
