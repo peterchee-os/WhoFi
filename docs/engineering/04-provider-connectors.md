@@ -238,6 +238,13 @@ Expected admin configuration:
 
 Deskworks is especially interesting for WhoFi because its product language already connects WiFi activity, check-ins, usage tracking, and billing.
 
+Current implementation state:
+
+- exact normalizer module exists at `lib/integrations/identity/deskworks`
+- demo-safe shape endpoint exists at `/api/profiles/deskworks/shape`
+- Settings integration card can test the normalized output shape
+- no live Deskworks API client, credentials, or production sync yet
+
 ## Nexudus Connector
 
 Nexudus should be an exact module.
@@ -270,6 +277,13 @@ Expected admin configuration:
 - last test result/error/timestamp
 
 Nexudus is likely one of the cleaner exact modules because the public developer surface is broad and API-first.
+
+Current implementation state:
+
+- exact normalizer module exists at `lib/integrations/identity/nexudus`
+- demo-safe shape endpoint exists at `/api/profiles/nexudus/shape`
+- Settings integration card can test the normalized output shape
+- no live Nexudus API client, credentials, or production sync yet
 
 ## Coworks Connector
 

@@ -1037,13 +1037,15 @@ function IntegrationCards({
       category: "Identity",
       description: "Coworking member, plan, and usage source",
       id: "identity-deskworks",
-      name: "Deskworks"
+      name: "Deskworks",
+      testPath: "/api/profiles/deskworks/shape"
     },
     {
       category: "Identity",
       description: "API-first member and location source",
       id: "identity-nexudus",
-      name: "Nexudus"
+      name: "Nexudus",
+      testPath: "/api/profiles/nexudus/shape"
     }
   ];
 
