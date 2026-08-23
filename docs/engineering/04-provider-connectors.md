@@ -355,6 +355,7 @@ Current implementation state:
 
 - exact normalizer module exists at `lib/integrations/identity/csv`
 - demo-safe shape endpoint exists at `/api/profiles/csv/shape`
+- preview endpoint exists at `/api/profiles/csv/preview`
 - Settings integration card can test normalized output from a fake CSV roster
 - parser supports comma-delimited and tab-delimited input with quoted fields
 - no production upload UI or persisted import job yet
