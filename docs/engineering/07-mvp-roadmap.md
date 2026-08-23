@@ -67,6 +67,7 @@ Non-goal for this phase:
 - requiring Omada Standard/licensed features
 - changing captive portal settings
 - blocking/quarantining devices from WhoFi
+- replacing shared-password or staff-managed WiFi with passwordless onboarding
 
 ## Phase 3: Progressive Profiles
 
@@ -157,8 +158,13 @@ Goal:
 
 Strengthen device-to-profile binding on selected SSIDs.
 
+This is the first phase where WhoFi may become an access/onboarding product. Until this phase, WhoFi is a passive identity and visibility layer, not a passwordless WiFi replacement.
+
 Deliverables:
 
+- passwordless-ready onboarding design:
+  - magic link, SSO, or member-system identity handoff
+  - Passpoint, iPSK, or RADIUS/EAP-TLS evaluation
 - portal identity flows:
   - quick guest
   - event/hackathon

@@ -6,6 +6,8 @@ WhoFi is an open-source WiFi identity ledger for coworking spaces, hackathons, e
 
 The project is intentionally not a Fortune 100 NAC platform. It starts with visibility, progressive identity, and useful alerts before adding enforcement.
 
+WhoFi is not passwordless WiFi onboarding in the MVP. It is passwordless-ready: it can observe and map devices on an existing network today, then later plug into captive portal, Passpoint, iPSK, RADIUS/EAP-TLS, or controller authorization flows when an operator wants access control.
+
 WhoFi should distinguish between:
 
 - `known_agent`: a registered machine/agent host with explicit identity evidence
@@ -23,7 +25,7 @@ network observations
 -> guest/member/staff/company/agent context
 -> optional coworking/property-system links
 -> bandwidth and anomaly visibility
--> optional captive portal or enforcement
+-> optional passwordless onboarding, captive portal, or enforcement
 ```
 
 ## Intended Users

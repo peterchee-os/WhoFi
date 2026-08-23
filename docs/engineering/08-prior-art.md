@@ -6,6 +6,8 @@ Date: 2026-08-23
 
 WhoFi is not unique because captive portals and guest WiFi email-capture tools already exist.
 
+WhoFi should also not overclaim against commercial guest WiFi platforms. Products such as Purple sell access/onboarding, captive portal, tiered access, member-system integrations, and passwordless returning-member authentication. WhoFi's MVP is not that category yet; it starts as a passive WiFi identity and device visibility ledger that can become passwordless-ready later.
+
 WhoFi is potentially differentiated because it combines:
 
 - WiFi/device observation
@@ -14,7 +16,7 @@ WhoFi is potentially differentiated because it combines:
 - bandwidth/session ledger
 - provider connectors for coworking/property systems
 - local/demo and production deployment modes
-- optional captive portal/enforcement later
+- optional passwordless onboarding, captive portal, and enforcement later
 
 Most existing open-source projects solve one slice: captive portal page, gateway enforcement, UniFi email capture, OpenWrt hotspot, RADIUS admin, or enterprise NAC.
 
@@ -232,3 +234,22 @@ guest, member, staff, company, home visitor, event, and hackathon profiles
 ```
 
 So the opportunity is not "invent captive portals." The opportunity is packaging the right combination for operators who need to understand devices, owners, guest/member context, event context, and bandwidth with a lighter, clearer product than enterprise NAC.
+
+## Commercial Reference: Purple
+
+URL: https://www.purple.ai/en-us/industries/coworking-spaces
+
+Purple's coworking-space positioning is access/onboarding led: branded captive portal, CRM/member-system integrations, tiered access by plan, WPA2-Enterprise for staff, Passpoint/profile authentication for higher tiers, and passwordless returning-member authentication.
+
+Overlap:
+
+- coworking WiFi
+- member/visitor context
+- analytics and integrations
+- optional access tiers
+
+Difference:
+
+- Purple starts at guest WiFi access and marketing/analytics.
+- WhoFi MVP starts at passive identity, device visibility, bandwidth/session ledger, and progressive profile review.
+- WhoFi should not call itself passwordless until it can provision or authorize access through captive portal, Passpoint, iPSK, RADIUS/EAP-TLS, or equivalent controller workflows.

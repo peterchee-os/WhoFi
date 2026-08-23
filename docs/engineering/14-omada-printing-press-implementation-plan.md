@@ -153,7 +153,12 @@ Never commit live test output with real client data.
 Status:
 
 - `whofi observations --json` live read-only smoke test passed privately.
-- Negative-path tests still need to be scripted.
+- 2026-08-23 bridge validation passed privately: the TypeScript Omada connector and optional Printing Press CLI bridge both returned the same active-client count through `/api/observations/omada/compare`.
+- Missing-config and bad-password negative paths exit nonzero without emitting observation payloads.
+- Private CLI redaction was tightened for token-shaped strings, MAC addresses, and IP addresses, with a unit test included in the saved reapply patch.
+- Private CLI now includes `whofi doctor` and `whofi doctor --live`; live doctor checks config, base URL parsing, login, and active-client endpoint readiness without emitting observations.
+- Private smoke script `smoke-omada-pp.sh` runs missing-config, offline doctor, live doctor, and sanitized live observation summary. Active-client counts are live telemetry and should be expected to fluctuate.
+- Additional negative-path cases still need to be scripted: bad site id and no network/timeout.
 
 ## Phase 5: Decide Runtime Integration
 
@@ -220,9 +225,7 @@ Current best next task:
 
 ```text
 Harden the private Omada CLI and bridge:
-  script negative-path tests,
-  add doctor --live behavior,
-  compare TypeScript vs CLI observation counts,
+  finish scripted negative-path tests,
   identify a post-generation hook or cleaner companion-module strategy.
 ```
 
