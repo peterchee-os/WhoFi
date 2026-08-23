@@ -22,6 +22,7 @@ Latest completed slices:
 - safe Omada CLI doctor route that returns readiness checks only
 - optional verification anchor support for client MAC or AP/BSSID MAC smoke tests
 - live device snapshot gate via `WHOFI_ENABLE_LIVE_DEVICE_SOURCES`
+- optional live source token via `WHOFI_LIVE_DEVICE_SOURCE_TOKEN`
 
 The UI intentionally avoids visible product-mode tabs such as event/coworking/home. The product can support those contexts internally, but the operator experience should stay focused on who and what is on the WiFi.
 
@@ -86,7 +87,7 @@ Recommended next slice:
 Add app-level admin authentication before hosted live-network use
 ```
 
-The demo app now has explicit live-source buttons, and `/api/devices?source=omada` / `source=omada-pp` can return real MAC/IP/hostname data only when `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true`. Before exposing a hosted deployment against real tenant WiFi, add:
+The demo app now has explicit live-source buttons, and `/api/devices?source=omada` / `source=omada-pp` can return real MAC/IP/hostname data only when `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true`. When `WHOFI_LIVE_DEVICE_SOURCE_TOKEN` is set, live source requests also need `X-WhoFi-Live-Source-Token`. Before exposing a hosted deployment against real tenant WiFi, add:
 
 - app-level admin authentication
 - tenant/operator access control around provider config

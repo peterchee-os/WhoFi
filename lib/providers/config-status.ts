@@ -2,6 +2,7 @@ export type ProviderConfigStatus = {
   configured: boolean;
   detail?: string;
   displayName: string;
+  liveSourceTokenRequired?: boolean;
   liveSnapshotsEnabled?: boolean;
   missing: string[];
   providerId: string;
@@ -10,11 +11,13 @@ export type ProviderConfigStatus = {
 
 export function getNetworkProviderConfigStatus(env: NodeJS.ProcessEnv = process.env): ProviderConfigStatus[] {
   const liveSnapshotsEnabled = env.WHOFI_ENABLE_LIVE_DEVICE_SOURCES === "true";
+  const liveSourceTokenRequired = Boolean(env.WHOFI_LIVE_DEVICE_SOURCE_TOKEN);
 
   return [
     getStatus({
       detail: "Essentials/free read-only telemetry first",
       displayName: "Omada",
+      liveSourceTokenRequired,
       liveSnapshotsEnabled,
       providerId: "omada",
       required: [
@@ -30,6 +33,7 @@ export function getNetworkProviderConfigStatus(env: NodeJS.ProcessEnv = process.
     getStatus({
       detail: "Optional Printing Press collector path",
       displayName: "Omada Printing Press CLI",
+      liveSourceTokenRequired,
       liveSnapshotsEnabled,
       providerId: "omada-printing-press",
       required: [
@@ -55,6 +59,7 @@ function getStatus({
   detail,
   displayName,
   env,
+  liveSourceTokenRequired,
   liveSnapshotsEnabled,
   providerId,
   required
@@ -62,6 +67,7 @@ function getStatus({
   detail?: string;
   displayName: string;
   env: NodeJS.ProcessEnv;
+  liveSourceTokenRequired?: boolean;
   liveSnapshotsEnabled?: boolean;
   providerId: string;
   required: string[];
@@ -72,6 +78,7 @@ function getStatus({
     configured: missing.length === 0,
     detail,
     displayName,
+    liveSourceTokenRequired,
     liveSnapshotsEnabled,
     missing,
     providerId,

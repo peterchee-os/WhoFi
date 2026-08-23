@@ -75,6 +75,8 @@ The dashboard source switcher uses this endpoint to keep demo mode as the defaul
 
 Live network sources are disabled unless `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true`. Demo mode remains available without that flag.
 
+If `WHOFI_LIVE_DEVICE_SOURCE_TOKEN` is set, live source requests must include the same value in `X-WhoFi-Live-Source-Token`. The dashboard has a local password field for this token and sends it only when loading live sources.
+
 Set `WHOFI_VERIFICATION_CLIENT_MAC` and optional `WHOFI_VERIFICATION_CLIENT_LABEL` when an operator wants a known client as a smoke-test anchor. `WHOFI_VERIFICATION_ANCHOR_KIND=client` checks the observed client MAC; `WHOFI_VERIFICATION_ANCHOR_KIND=access_point` checks the AP/BSSID MAC reported with active client rows. The API only reports whether that anchor is configured and present; it does not echo the configured MAC address.
 
 This endpoint is the public API boundary the dashboard should use before real database persistence exists. Live sources return MAC/IP/host fields from the configured controller, so production deployments should protect this endpoint behind normal app authentication before exposing real tenant networks.

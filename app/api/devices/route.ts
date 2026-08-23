@@ -37,6 +37,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    if (!liveDeviceSourceTokenValid(request)) {
+      return NextResponse.json(
+        {
+          error: "Live device source token required",
+          source
+        },
+        {
+          status: 401
+        }
+      );
+    }
+
     if (source === "omada") {
       const client = getOmadaClientFromEnv();
       const observations = await listOmadaObservations(client, {
@@ -73,6 +85,12 @@ function readSource(request: NextRequest): DeviceSource {
 
 function liveDeviceSourcesEnabled() {
   return process.env.WHOFI_ENABLE_LIVE_DEVICE_SOURCES === "true";
+}
+
+function liveDeviceSourceTokenValid(request: NextRequest) {
+  const expected = process.env.WHOFI_LIVE_DEVICE_SOURCE_TOKEN;
+  if (!expected) return true;
+  return request.headers.get("X-WhoFi-Live-Source-Token") === expected;
 }
 
 function redactDeviceSourceError(value: string) {

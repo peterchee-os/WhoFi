@@ -226,6 +226,30 @@ textarea {
   margin-left: 2px;
 }
 
+.live-token-field {
+  min-height: 38px;
+  width: 148px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+}
+
+.live-token-field input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .icon-button,
 .text-button {
   min-height: 38px;
@@ -974,6 +998,10 @@ textarea {
     width: 100%;
     justify-content: flex-start;
     overflow-x: auto;
+  }
+
+  .live-token-field {
+    width: 100%;
   }
 
   .nav {

@@ -96,6 +96,7 @@ type NetworkProviderConfigStatus = {
   configured: boolean;
   detail?: string;
   displayName: string;
+  liveSourceTokenRequired?: boolean;
   liveSnapshotsEnabled?: boolean;
   missing: string[];
   providerId: string;
@@ -246,6 +247,7 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [selectedDeviceId, setSelectedDeviceId] = useState("dev-unknown-burst");
   const [deviceSnapshotSource, setDeviceSnapshotSource] = useState<DeviceSnapshotSource>("demo");
+  const [liveSourceToken, setLiveSourceToken] = useState("");
   const [sourceDevices, setSourceDevices] = useState<Device[]>(demoDevices);
   const [sourceState, setSourceState] = useState<IntegrationTestState>({
     message: "Demo",
@@ -389,7 +391,8 @@ export default function Home() {
     }
 
     try {
-      const response = await fetch(`/api/devices?source=${source}`);
+      const headers = liveSourceToken.trim() ? { "X-WhoFi-Live-Source-Token": liveSourceToken.trim() } : undefined;
+      const response = await fetch(`/api/devices?source=${source}`, { headers });
       const payload = (await response.json()) as {
         devices?: Device[];
         error?: string;
@@ -570,6 +573,17 @@ export default function Home() {
               ))}
               <span className={`integration-state ${sourceState.status}`}>{sourceState.message}</span>
             </div>
+            <label className="live-token-field" title="Live source token">
+              <KeyRound size={16} />
+              <input
+                aria-label="Live source token"
+                autoComplete="off"
+                onChange={(event) => setLiveSourceToken(event.target.value)}
+                placeholder="Live token"
+                type="password"
+                value={liveSourceToken}
+              />
+            </label>
             <button className="icon-button" onClick={resetDemoState} title="Reset">
               <RefreshCcw size={18} />
             </button>
@@ -1408,6 +1422,9 @@ function NetworkProviderStatus({
               <span>{provider.configured ? "Required env present" : `Missing ${provider.missing.join(", ")}`}</span>
               {typeof provider.liveSnapshotsEnabled === "boolean" ? (
                 <span>{provider.liveSnapshotsEnabled ? "Live snapshots enabled" : "Live snapshots disabled"}</span>
+              ) : null}
+              {typeof provider.liveSourceTokenRequired === "boolean" ? (
+                <span>{provider.liveSourceTokenRequired ? "Live token required" : "Live token not configured"}</span>
               ) : null}
             </div>
             <div className="provider-status-actions">
