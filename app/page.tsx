@@ -916,7 +916,7 @@ function SettingsView({
 
       <div className="side-stack">
         <IntegrationCards onAddActivity={onAddActivity} onNotice={onNotice} />
-        <NetworkProviderStatus />
+        <NetworkProviderStatus onAddActivity={onAddActivity} onNotice={onNotice} />
         <CsvImportPreview onAddActivity={onAddActivity} onNotice={onNotice} />
 
         <section className="panel">
@@ -1153,8 +1153,18 @@ function formatIntegrationStatus(status: IntegrationCatalogItem["status"]) {
   return "planned";
 }
 
-function NetworkProviderStatus() {
+function NetworkProviderStatus({
+  onAddActivity,
+  onNotice
+}: {
+  onAddActivity: (message: string) => void;
+  onNotice: (notice: string) => void;
+}) {
   const [providers, setProviders] = useState<NetworkProviderConfigStatus[]>([]);
+  const [compareState, setCompareState] = useState<IntegrationTestState>({
+    message: "Not compared",
+    status: "idle"
+  });
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -1177,6 +1187,45 @@ function NetworkProviderStatus() {
       cancelled = true;
     };
   }, []);
+
+  const compareOmadaConnectors = async () => {
+    setCompareState({
+      message: "Comparing",
+      status: "testing"
+    });
+
+    try {
+      const response = await fetch("/api/observations/omada/compare");
+      const payload = (await response.json()) as {
+        cli?: { count?: number; error?: string; status?: string };
+        match?: boolean;
+        typescript?: { count?: number; error?: string; status?: string };
+      };
+      if (!response.ok || !payload.cli || !payload.typescript) {
+        throw new Error(payload.cli?.error ?? payload.typescript?.error ?? "Compare failed");
+      }
+
+      const message = payload.match
+        ? `Match: ${payload.typescript.count ?? 0}`
+        : `TS ${payload.typescript.count ?? "?"} / CLI ${payload.cli.count ?? "?"}`;
+      setCompareState({
+        message,
+        status: payload.match ? "success" : "error",
+        testedAt: new Date().toISOString()
+      });
+      onNotice(payload.match ? "Connectors match" : "Connector counts differ");
+      onAddActivity(`Omada connector comparison: ${message}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Compare failed";
+      setCompareState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      onNotice("Compare failed");
+      onAddActivity(`Omada connector comparison failed: ${message}`);
+    }
+  };
 
   return (
     <section className="panel">
@@ -1207,9 +1256,19 @@ function NetworkProviderStatus() {
               {provider.detail ? <span>{provider.detail}</span> : null}
               <span>{provider.configured ? "Required env present" : `Missing ${provider.missing.join(", ")}`}</span>
             </div>
-            <span className={`integration-state ${provider.configured ? "success" : "idle"}`}>
-              {provider.configured ? "Configured" : "Missing"}
-            </span>
+            <div className="provider-status-actions">
+              {provider.providerId === "omada-printing-press" && provider.configured ? (
+                <button className="text-button" onClick={compareOmadaConnectors} title="Compare Omada connectors">
+                  <Activity size={17} />
+                  Compare
+                </button>
+              ) : null}
+              <span className={`integration-state ${provider.configured ? "success" : "idle"}`}>
+                {provider.providerId === "omada-printing-press" && compareState.status !== "idle"
+                  ? compareState.message
+                  : provider.configured ? "Configured" : "Missing"}
+              </span>
+            </div>
           </div>
         ))}
       </div>

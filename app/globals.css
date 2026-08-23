@@ -717,6 +717,14 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.provider-status-actions {
+  align-items: flex-end;
+  display: grid;
+  flex: 0 0 auto;
+  gap: 8px;
+  justify-items: end;
+}
+
 .rule-list {
   display: grid;
 }
