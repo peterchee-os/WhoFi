@@ -178,6 +178,24 @@ WhoFi Omada provider
   -> persists observations
 ```
 
+Current bridge:
+
+```text
+WhoFi Omada CLI test route
+  -> checks OMADA_PP_CLI_PATH
+  -> runs omada-essential-pp-cli whofi observations --json
+  -> validates normalized observations
+  -> returns count + observations
+
+WhoFi Omada compare route
+  -> calls the TypeScript connector
+  -> calls the Printing Press CLI bridge
+  -> returns count + match status only
+  -> does not return client observations
+```
+
+This is intentionally a smoke-test bridge, not the default production connector. It lets a private deployment compare the TypeScript connector and Printing Press connector without committing generated private CLI code into the public repo.
+
 If not accepted:
 
 ```text
@@ -201,9 +219,10 @@ When this work advances, update:
 Current best next task:
 
 ```text
-Harden the private Omada CLI:
+Harden the private Omada CLI and bridge:
   script negative-path tests,
   add doctor --live behavior,
+  compare TypeScript vs CLI observation counts,
   identify a post-generation hook or cleaner companion-module strategy.
 ```
 

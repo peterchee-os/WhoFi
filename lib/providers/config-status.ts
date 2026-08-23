@@ -24,6 +24,20 @@ export function getNetworkProviderConfigStatus(env: NodeJS.ProcessEnv = process.
       env
     }),
     getStatus({
+      detail: "Optional Printing Press collector path",
+      displayName: "Omada Printing Press CLI",
+      providerId: "omada-printing-press",
+      required: [
+        "OMADA_PP_CLI_PATH",
+        "OMADA_API_BASE_URL",
+        "OMADA_CONTROLLER_ID",
+        "OMADA_SITE_ID",
+        "OMADA_USERNAME",
+        "OMADA_PASSWORD"
+      ],
+      env
+    }),
+    getStatus({
       displayName: "Cisco Meraki",
       providerId: "meraki",
       required: ["MERAKI_NETWORK_ID", "MERAKI_API_KEY"],

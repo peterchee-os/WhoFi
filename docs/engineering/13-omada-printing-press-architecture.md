@@ -110,6 +110,19 @@ Cons:
 - generated auth layer needs a hand patch
 - WhoFi must handle CLI failures/timeouts carefully
 
+Current public WhoFi support:
+
+```text
+GET /api/observations/omada/cli-test
+  -> requires OMADA_PP_CLI_PATH
+  -> runs: <path> whofi observations --json
+  -> accepts either an array of observations or { observations: [...] }
+  -> validates the normalized output shape
+  -> redacts common secret-like, MAC, and IP strings from errors
+```
+
+The route exists as a private-deployment smoke-test bridge. It should not appear as a normal UI live-test action until WhoFi has saved provider configuration and a clear operator permission model.
+
 ### Option C: Collector Sidecar
 
 Run the printed CLI as part of a local collector inside the operator network.
@@ -189,6 +202,8 @@ OMADA_SITE_ID=
 OMADA_SITE_NAME=
 OMADA_USERNAME=
 OMADA_PASSWORD=
+OMADA_PP_CLI_PATH=
+OMADA_PP_CLI_TIMEOUT_MS=15000
 ```
 
 The public repo can document names and purposes. Real values belong only in private deployment configuration or a secret manager.
