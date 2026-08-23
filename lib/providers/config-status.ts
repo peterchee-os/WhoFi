@@ -1,5 +1,6 @@
 export type ProviderConfigStatus = {
   configured: boolean;
+  detail?: string;
   displayName: string;
   missing: string[];
   providerId: string;
@@ -9,9 +10,17 @@ export type ProviderConfigStatus = {
 export function getNetworkProviderConfigStatus(env: NodeJS.ProcessEnv = process.env): ProviderConfigStatus[] {
   return [
     getStatus({
+      detail: "Essentials/free read-only telemetry first",
       displayName: "Omada",
       providerId: "omada",
-      required: ["OMADA_API_BASE_URL", "OMADA_CONTROLLER_ID", "OMADA_SITE_ID", "OMADA_USERNAME", "OMADA_PASSWORD"],
+      required: [
+        "OMADA_SERVICE_TIER",
+        "OMADA_API_BASE_URL",
+        "OMADA_CONTROLLER_ID",
+        "OMADA_SITE_ID",
+        "OMADA_USERNAME",
+        "OMADA_PASSWORD"
+      ],
       env
     }),
     getStatus({
@@ -24,11 +33,13 @@ export function getNetworkProviderConfigStatus(env: NodeJS.ProcessEnv = process.
 }
 
 function getStatus({
+  detail,
   displayName,
   env,
   providerId,
   required
 }: {
+  detail?: string;
   displayName: string;
   env: NodeJS.ProcessEnv;
   providerId: string;
@@ -38,6 +49,7 @@ function getStatus({
 
   return {
     configured: missing.length === 0,
+    detail,
     displayName,
     missing,
     providerId,

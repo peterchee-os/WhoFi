@@ -155,6 +155,27 @@ Responsibilities:
 - optionally authorize captive portal clients
 - optionally block/quarantine clients later
 
+### Service Tier Decision
+
+Use the existing **Essentials / Free** Omada organization first.
+
+Omada's organization add flow exposes two paths:
+
+- **Essentials / Free**: includes Omada Network management, site map, quick VLAN configuration, and enough dashboard/client telemetry for WhoFi's first read-only device ledger.
+- **Standard / Licensed**: adds SSO login, richer security features, richer captive portal types, WLAN optimization, backup/restore/site migration, maps, and reports.
+
+WhoFi should start on Essentials because the first product goal is visibility:
+
+```text
+current clients
+-> MAC/IP/name/SSID/AP/site
+-> traffic counters
+-> unknown/known owner resolution
+-> review and alert workflow
+```
+
+Do not require a Standard licensed Omada org for MVP. Treat Standard as a later option if an operator needs richer captive portals, licensed reporting, or security controls that Essentials does not expose.
+
 Open spike questions:
 
 - exact best API endpoint for current clients
@@ -167,13 +188,19 @@ Current browser recon notes:
 - Shared Chrome has an authenticated Omada Cloud tab for the Thinkspace organization.
 - The visible console is the Omada Cloud Management Platform in the US East region.
 - The active UI is the Essential Controller experience.
+- The org manager showed Thinkspace as `Essentials`; the Add Organization modal showed `Essentials / Free` and `Standard / Licensed`.
+- We did not create a new Omada organization. WhoFi should connect to the existing Thinkspace Essentials org first.
 - The selected site in the UI was Seattle during recon.
 - Client table columns visible in the UI: client name, IP address, authentication type, status, SSID, network, AP/port, download traffic, uptime, and actions.
-- The loaded public bundle defines the current clients endpoint as `/{omadacId}/api/v2/sites/{siteId}/insight/clients`.
+- The Essential Controller API host discovered from browser storage was `https://use1-api-omada-essential-controller.tplinkcloud.com`.
+- The console uses a controller/org path segment before `/api/v2`.
+- Browser resource traces confirmed API paths such as `/api/v2/sites/{siteId}/site/workspace`, `/api/v2/sites/{siteId}/dashboard/activeSsids`, and OpenAPI dashboard routes such as `/openapi/v1/{controllerId}/sites/{siteId}/dashboard/active-clients`.
+- Earlier bundle recon suggested a current clients path under `/{controllerId}/api/v2/sites/{siteId}/insight/clients`; keep this as a candidate until the live read-only connector confirms the exact best endpoint.
 - Related actions exist for block/unblock/delete client and past connection/portal-auth history, but MVP should stay read-only.
 
 Expected server-side config:
 
+- `OMADA_SERVICE_TIER`: `essentials` for the free route; `standard` only when intentionally using a licensed org.
 - `OMADA_API_BASE_URL`: Essential Controller API host, e.g. regional Omada Essential Controller API base URL.
 - `OMADA_CONTROLLER_ID`: the Omada controller/org id path segment used before `/api/v2`.
 - `OMADA_SITE_ID`: selected site id, such as Seattle or Redmond once mapped.
@@ -183,6 +210,7 @@ Expected server-side config:
 Credential note:
 
 - Thinkspace has a 1Password item named `Omada TPLink Cloud WIFI SEA`.
+- That item also stores WhoFi-specific Omada metadata for the Essentials/free route.
 - Do not commit values from that item. Use it only for private deployment env injection or local spike work.
 
 ## Cisco Meraki Connector

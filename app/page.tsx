@@ -86,6 +86,7 @@ type CsvPreviewState = {
 
 type NetworkProviderConfigStatus = {
   configured: boolean;
+  detail?: string;
   displayName: string;
   missing: string[];
   providerId: string;
@@ -1203,6 +1204,7 @@ function NetworkProviderStatus() {
           <div className="provider-status-row" key={provider.providerId}>
             <div>
               <strong>{provider.displayName}</strong>
+              {provider.detail ? <span>{provider.detail}</span> : null}
               <span>{provider.configured ? "Required env present" : `Missing ${provider.missing.join(", ")}`}</span>
             </div>
             <span className={`integration-state ${provider.configured ? "success" : "idle"}`}>

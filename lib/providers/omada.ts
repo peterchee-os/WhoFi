@@ -19,6 +19,7 @@ export type OmadaProviderConfig = NetworkProviderConfig & {
   type: "omada";
   apiBaseUrl?: string;
   controllerId?: string;
+  serviceTier?: "essentials" | "standard";
   siteId?: string;
   siteName?: string;
 };

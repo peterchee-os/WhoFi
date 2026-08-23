@@ -49,6 +49,7 @@ Deliverables:
 
 - network provider interface
 - Omada telemetry spike
+- Omada Essentials/free route first
 - device table
 - observation events
 - session rollups
@@ -56,10 +57,16 @@ Deliverables:
 
 Exit criteria:
 
-- list online clients from Omada
+- list online clients from an existing Omada Essentials org
 - store MAC/AP/SSID/site/traffic counters
 - show unknown devices
 - show top bandwidth devices
+
+Non-goal for this phase:
+
+- requiring Omada Standard/licensed features
+- changing captive portal settings
+- blocking/quarantining devices from WhoFi
 
 ## Phase 3: Progressive Profiles
 
