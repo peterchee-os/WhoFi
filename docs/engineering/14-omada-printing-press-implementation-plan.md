@@ -160,6 +160,7 @@ Status:
 - Private smoke script `smoke-omada-pp.sh` runs missing-config, offline doctor, live doctor, and sanitized live observation summary. Active-client counts are live telemetry and should be expected to fluctuate.
 - Bad-site-id live negative path is scripted and fails cleanly at the active-client endpoint without emitting observations.
 - Connectivity/timeout live negative path is scripted with a short configurable timeout and fails cleanly at login without emitting observations.
+- Private extension registration now uses the generated CLI's `registerNovelCommand` hook instead of editing generated root command wiring directly.
 
 ## Phase 5: Decide Runtime Integration
 
@@ -226,7 +227,7 @@ Current best next task:
 
 ```text
 Harden the private Omada CLI and bridge:
-  identify a post-generation hook or cleaner companion-module strategy.
+  decide whether the hook-based patch should become a maintained private companion module.
 ```
 
 Do not move the generated CLI into the public WhoFi repo until it passes that smoke test and has been scrubbed for private artifacts.
