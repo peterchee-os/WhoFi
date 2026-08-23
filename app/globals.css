@@ -633,6 +633,43 @@ textarea {
   margin: -4px 18px 14px;
 }
 
+.snapshot-review-signals {
+  margin: 0 18px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.snapshot-review-signal {
+  padding: 10px;
+  border-top: 1px solid #edf0ed;
+  border-left: 4px solid var(--teal);
+}
+
+.snapshot-review-signal.watch {
+  border-left-color: var(--amber);
+}
+
+.snapshot-review-signal.warning {
+  border-left-color: var(--red);
+}
+
+.snapshot-review-signal div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.snapshot-review-signal strong {
+  font-size: 13px;
+}
+
+.snapshot-review-signal span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .device-change-grid {
   padding: 0 18px 14px;
   display: grid;

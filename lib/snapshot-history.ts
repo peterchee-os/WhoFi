@@ -38,6 +38,7 @@ export type SnapshotCaptureComparison = {
   previousCapturedAt: string;
   previousId: string;
   previousObservedAt: string;
+  reviewSignals: SnapshotReviewSignal[];
 };
 
 export type SnapshotDeviceChange = {
@@ -49,10 +50,20 @@ export type SnapshotDeviceChange = {
   totalBytes: number;
 };
 
+export type SnapshotReviewSignal = {
+  detail: string;
+  id: string;
+  label: string;
+  severity: "info" | "watch" | "warning";
+};
+
 export function buildSnapshotCaptureComparison(
   current: SnapshotCaptureRecord,
   previous: SnapshotCaptureRecord
 ): SnapshotCaptureComparison {
+  const newDevices = getNewDevices(current, previous);
+  const missingDevices = getMissingDevices(current, previous);
+
   return {
     deltas: {
       onlineDevices: current.summary.onlineDevices - previous.summary.onlineDevices,
@@ -62,11 +73,12 @@ export function buildSnapshotCaptureComparison(
       totalTxBytes: current.sessionSnapshot.totals.totalTxBytes - previous.sessionSnapshot.totals.totalTxBytes,
       unknownDevices: current.summary.unknownDevices - previous.summary.unknownDevices
     },
-    missingDevices: getMissingDevices(current, previous),
-    newDevices: getNewDevices(current, previous),
+    missingDevices,
+    newDevices,
     previousCapturedAt: previous.capturedAt,
     previousId: previous.id,
-    previousObservedAt: previous.summary.observedAt
+    previousObservedAt: previous.summary.observedAt,
+    reviewSignals: buildReviewSignals(current, previous, newDevices, missingDevices)
   };
 }
 
@@ -97,6 +109,91 @@ function toDeviceChange(device: Device): SnapshotDeviceChange {
     status: device.status,
     totalBytes: device.rxBytes + device.txBytes
   };
+}
+
+function buildReviewSignals(
+  current: SnapshotCaptureRecord,
+  previous: SnapshotCaptureRecord,
+  newDevices: SnapshotDeviceChange[],
+  missingDevices: SnapshotDeviceChange[]
+): SnapshotReviewSignal[] {
+  const currentDeviceIds = new Set(current.deviceSnapshot.devices.map((device) => device.id));
+  const previousDeviceIds = new Set(previous.deviceSnapshot.devices.map((device) => device.id));
+  const newRawDevices = current.deviceSnapshot.devices.filter((device) => !previousDeviceIds.has(device.id));
+  const missingRawDevices = previous.deviceSnapshot.devices.filter((device) => !currentDeviceIds.has(device.id));
+  const signals: SnapshotReviewSignal[] = [];
+  const unknownNewDevices = newRawDevices.filter((device) => device.status === "unknown");
+  const riskyNewDevices = newRawDevices.filter((device) => device.riskState !== "normal");
+  const missingLinkedDevices = missingRawDevices.filter((device) =>
+    ["agent_host", "claimed", "managed", "staff_assigned"].includes(device.status)
+  );
+
+  if (unknownNewDevices.length) {
+    signals.push({
+      detail: summarizeDeviceHostnames(unknownNewDevices),
+      id: "new-unknown-devices",
+      label: `${unknownNewDevices.length} new unknown ${pluralize("device", unknownNewDevices.length)}`,
+      severity: "warning"
+    });
+  }
+
+  if (riskyNewDevices.length) {
+    signals.push({
+      detail: summarizeDeviceHostnames(riskyNewDevices),
+      id: "new-risky-devices",
+      label: `${riskyNewDevices.length} new ${pluralize("device", riskyNewDevices.length)} with review state`,
+      severity: "watch"
+    });
+  }
+
+  if (missingLinkedDevices.length) {
+    signals.push({
+      detail: summarizeDeviceHostnames(missingLinkedDevices),
+      id: "missing-linked-devices",
+      label: `${missingLinkedDevices.length} linked ${pluralize("device", missingLinkedDevices.length)} disappeared`,
+      severity: "watch"
+    });
+  }
+
+  if (current.summary.unknownDevices > previous.summary.unknownDevices) {
+    signals.push({
+      detail: `${previous.summary.unknownDevices} -> ${current.summary.unknownDevices} unknown devices`,
+      id: "unknown-count-increased",
+      label: "Unknown device count increased",
+      severity: "watch"
+    });
+  }
+
+  if (current.summary.reviewSignals > previous.summary.reviewSignals) {
+    signals.push({
+      detail: `${previous.summary.reviewSignals} -> ${current.summary.reviewSignals} review signals`,
+      id: "review-signal-count-increased",
+      label: "Review signal count increased",
+      severity: "watch"
+    });
+  }
+
+  if (newDevices.length === 0 && missingDevices.length === 0 && signals.length === 0) {
+    signals.push({
+      detail: "No material device movement since the previous stored capture.",
+      id: "stable-capture",
+      label: "Stable capture",
+      severity: "info"
+    });
+  }
+
+  return signals.slice(0, 6);
+}
+
+function summarizeDeviceHostnames(devices: Device[]) {
+  return devices
+    .slice(0, 3)
+    .map((device) => device.hostname || device.mac)
+    .join(", ");
+}
+
+function pluralize(noun: string, count: number) {
+  return count === 1 ? noun : `${noun}s`;
 }
 
 export function createSnapshotHistoryEntry(

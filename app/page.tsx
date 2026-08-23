@@ -1389,6 +1389,7 @@ function SnapshotCapturePanel({
           ) : (
             <p className="comparison-caption">No earlier stored capture for this source.</p>
           )}
+          {comparison ? <SnapshotReviewSignalList comparison={comparison} /> : null}
           {comparison ? <DeviceChangeSummary comparison={comparison} /> : null}
           <div className="list">
             {topDevices.map((device) => (
@@ -1468,6 +1469,25 @@ function SnapshotHistoryPanel({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function SnapshotReviewSignalList({ comparison }: { comparison: SnapshotCaptureComparison }) {
+  return (
+    <div className="snapshot-review-signals">
+      <div className="device-change-header">
+        <strong>Review Signals</strong>
+        <span className="metric-pill">{comparison.reviewSignals.length}</span>
+      </div>
+      {comparison.reviewSignals.map((signal) => (
+        <div className={`snapshot-review-signal ${signal.severity}`} key={signal.id}>
+          <div>
+            <strong>{signal.label}</strong>
+            <span>{signal.detail}</span>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -68,7 +68,7 @@ Captured device snapshots append summaries and bounded full captures to a local 
 .whofi/snapshot-history.json
 ```
 
-Set `WHOFI_SNAPSHOT_HISTORY_PATH` to move that file. `POST /api/snapshot-history/capture?source=demo|omada|omada-pp` captures and stores a snapshot, `GET /api/snapshot-history` returns summaries, `GET /api/snapshot-history?include=captures` includes recent full captures, and `GET /api/snapshot-history/{id}` returns one capture plus its delta from the previous same-source capture. The Usage tab can inspect stored captures and show their saved totals, rollups, top devices, comparison deltas, and new/missing device movement. This is a development/demo bridge toward database-backed, tenant-scoped observation and session persistence; `.whofi/` is ignored by git.
+Set `WHOFI_SNAPSHOT_HISTORY_PATH` to move that file. `POST /api/snapshot-history/capture?source=demo|omada|omada-pp` captures and stores a snapshot, `GET /api/snapshot-history` returns summaries, `GET /api/snapshot-history?include=captures` includes recent full captures, and `GET /api/snapshot-history/{id}` returns one capture plus its delta from the previous same-source capture. The Usage tab can inspect stored captures and show their saved totals, rollups, top devices, comparison deltas, new/missing device movement, and generated review-signal hints. This is a development/demo bridge toward database-backed, tenant-scoped observation and session persistence; `.whofi/` is ignored by git.
 
 ## Repository Principle
 
