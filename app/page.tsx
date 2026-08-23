@@ -932,7 +932,8 @@ function SettingsView({
           </div>
           <Activity size={20} color="var(--green)" />
         </div>
-        <table className="device-table delivery-table">
+        <div className="table-scroll">
+          <table className="device-table delivery-table">
           <thead>
             <tr>
               <th>Time</th>
@@ -955,7 +956,8 @@ function SettingsView({
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       </section>
     </section>
   );
@@ -992,7 +994,8 @@ function DeviceLedger({
         />
       </div>
 
-      <table className="device-table">
+      <div className="table-scroll">
+        <table className="device-table ledger-table">
         <thead>
           <tr>
             <th style={{ width: "27%" }}>Device</th>
@@ -1051,7 +1054,8 @@ function DeviceLedger({
             );
           })}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   );
 }

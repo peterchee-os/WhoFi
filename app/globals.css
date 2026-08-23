@@ -291,6 +291,19 @@ textarea {
   table-layout: fixed;
 }
 
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.ledger-table {
+  min-width: 900px;
+}
+
+.delivery-table {
+  min-width: 760px;
+}
+
 .device-table th,
 .device-table td {
   padding: 13px 18px;
@@ -307,6 +320,7 @@ textarea {
 
 .device-table td {
   font-size: 14px;
+  min-width: 0;
 }
 
 .device-table tr.selected-row td {
@@ -654,7 +668,12 @@ textarea {
   font-size: 13px;
 }
 
-.delivery-table td,
+.delivery-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .delivery-table th {
   white-space: nowrap;
 }
@@ -738,6 +757,10 @@ textarea {
 
   .span-2 {
     grid-column: auto;
+  }
+
+  .ledger-table {
+    min-width: 0;
   }
 
   .device-table {
