@@ -51,6 +51,7 @@ Identity provider
 8. [Prior Art And Competitive Open Source](08-prior-art.md)
 9. [Automation And AI-Like Usage Detection](09-automation-and-ai-detection.md)
 10. [Notifications](10-notifications.md)
+11. [Current Handoff](11-current-handoff.md)
 
 ## Non-Goals For MVP
 

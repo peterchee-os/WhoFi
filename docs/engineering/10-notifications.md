@@ -170,6 +170,131 @@ Minimal operator config:
 
 Location-specific config can come later.
 
+## Admin UI
+
+WhoFi should expose notification settings in the operator admin area, not as a public user-facing workflow.
+
+Recommended navigation:
+
+```text
+Settings
+  -> Notifications
+  -> Email
+```
+
+The first version should keep this utilitarian. It should let an operator configure alert delivery without exposing secrets, provider internals, or template complexity.
+
+### Email Settings Panel
+
+Fields:
+
+- provider mode: `disabled`, `console`, or `resend`
+- sender display name
+- sender email
+- reply-to email
+- operator digest recipients
+- critical alert recipients
+- batch settling minutes
+
+Actions:
+
+- save settings
+- send test email
+- disable email delivery
+- reset to defaults
+
+Status indicators:
+
+- provider mode
+- sender domain status: `not_configured`, `needs_verification`, `verified`, or `unknown`
+- last successful send timestamp
+- last failed send timestamp
+- most recent provider error, redacted
+
+The UI should never show `RESEND_API_KEY`. It may show whether a key is configured, such as `API key configured` or `API key missing`, but not the key value or prefix.
+
+### Recipient Rules Panel
+
+Operators should be able to decide who receives which emails.
+
+Initial rules:
+
+- daily operator digest
+- unknown high-bandwidth device
+- automation-like burst
+- revoked owner online
+- known agent missing heartbeat
+- collector offline
+
+Each rule should support:
+
+- enabled/disabled toggle
+- severity threshold
+- recipient group: digest recipients or critical recipients
+- immediate vs digest delivery
+
+Per-location recipient rules can wait until after MVP unless the implementation already has location-aware alert routing.
+
+### Test Email Flow
+
+The `Send test email` action should:
+
+1. Validate sender settings.
+2. Validate that at least one test recipient is present.
+3. Use the configured provider mode.
+4. Create an `email_delivery` row.
+5. Show success/failure in the UI without exposing provider secrets.
+
+In `console` mode, the UI should show that a test email was rendered locally but not delivered.
+
+In `disabled` mode, the UI should make it clear that no email will be sent.
+
+In `resend` mode, the UI should call a server-side action/API route that uses the Resend adapter. The browser must never call Resend directly.
+
+### Delivery Log UI
+
+The admin area should include a simple delivery log table for support and debugging.
+
+Columns:
+
+- created time
+- notification type
+- recipient
+- provider
+- status
+- provider message id, when available
+- redacted error
+
+Filters:
+
+- status
+- notification type
+- recipient
+- date range
+
+The delivery log should not include full rendered email bodies by default. A later support-only detail view can show rendered content if it is redacted and access-controlled.
+
+### Secret Configuration
+
+The UI can configure non-secret notification settings. Secrets stay in environment variables or deployment secret storage.
+
+Admin UI editable:
+
+- provider mode
+- sender name
+- sender email
+- reply-to email
+- recipients
+- batch settings
+- rule toggles
+
+Deployment-only:
+
+- `RESEND_API_KEY`
+- webhook signing secrets, if Resend webhooks are added later
+
+If `resend` is selected and no server-side key is present, the UI should save the mode but show a blocking status message until the deployment has `RESEND_API_KEY` configured.
+
 ## Security Notes
 
 - `RESEND_API_KEY` is server-only.
