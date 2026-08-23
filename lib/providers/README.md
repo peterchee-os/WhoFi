@@ -5,8 +5,8 @@ Network providers turn WiFi controller data into normalized WhoFi observations.
 Current providers:
 
 - `demo`: converts local demo devices into normalized observations
-- `omada`: normalizer types and snapshot conversion only; no real controller login yet
-- `meraki`: normalizer types and snapshot conversion only; no real Dashboard API login yet
+- `omada`: read-only Essentials client-list scaffold plus snapshot normalizer
+- `meraki`: Dashboard API read-only client-list scaffold plus snapshot normalizer
 
 ## Rules
 
@@ -29,14 +29,18 @@ Returns normalized observations generated from local demo data.
 
 ```text
 GET /api/observations/meraki/shape
+GET /api/observations/omada/shape
 ```
 
-Returns one fake Cisco Meraki client payload normalized into a WhoFi observation.
+Returns one fake provider client payload normalized into a WhoFi observation.
 
 ## Live Test Endpoints
 
 ```text
 GET /api/observations/meraki/test
+GET /api/observations/omada/test
 ```
 
 Uses server-side `MERAKI_API_KEY` and `MERAKI_NETWORK_ID` to fetch recent clients from the Meraki Dashboard API. Returns `409` when required env vars are missing. Never expose the API key in responses or logs.
+
+The Omada test endpoint uses server-side Omada credentials and Essentials controller metadata to fetch current active clients. It returns `409` when required env vars are missing. Never expose Omada credentials, session tokens, cookies, or raw HAR headers in responses or logs.

@@ -29,6 +29,7 @@ export type OmadaClientSnapshot = {
 export type OmadaProviderConfig = NetworkProviderConfig & {
   type: "omada";
   apiBaseUrl?: string;
+  cloudPortalUrl?: string;
   controllerId?: string;
   serviceTier?: "essentials" | "standard";
   siteId?: string;
@@ -44,6 +45,12 @@ export type OmadaClient = {
 export type OmadaClientQuery = {
   currentPage?: number;
   currentPageSize?: number;
+};
+
+type OmadaSession = {
+  cookie?: string;
+  token: string;
+  userId?: string;
 };
 
 export function normalizeOmadaClientSnapshot(
@@ -75,7 +82,7 @@ export async function listOmadaClientSnapshots(
   client: OmadaClient,
   query: OmadaClientQuery = {}
 ): Promise<OmadaClientSnapshot[]> {
-  const token = await loginOmada(client);
+  const session = await loginOmada(client);
   const currentPage = String(query.currentPage ?? 1);
   const currentPageSize = String(query.currentPageSize ?? 100);
   const url = new URL(
@@ -83,10 +90,16 @@ export async function listOmadaClientSnapshots(
     client.config.apiBaseUrl
   );
 
-  const payload = await fetchOmadaJson<OmadaClientListPayload>(client, url, token, {
+  const payload = await fetchOmadaJson<OmadaClientListPayload>(client, url, session, {
     body: {
+      filters: {
+        active: true
+      },
+      hideHealthUnsupported: true,
       page: Number(currentPage),
-      pageSize: Number(currentPageSize)
+      pageSize: Number(currentPageSize),
+      scope: 1,
+      sorts: {}
     },
     method: "POST"
   });
@@ -120,6 +133,7 @@ export function getOmadaClientFromEnv(env: NodeJS.ProcessEnv = process.env): Oma
   return {
     config: {
       apiBaseUrl,
+      cloudPortalUrl: env.OMADA_CLOUD_PORTAL_URL ?? "https://use1-omada-cloud.tplinkcloud.com",
       controllerId,
       displayName: "Omada",
       id: env.OMADA_PROVIDER_ID ?? "omada",
@@ -141,6 +155,14 @@ type OmadaLoginPayload = {
   };
 };
 
+type OmadaInitInfoPayload = {
+  errorCode?: number;
+  msg?: string;
+  result?: {
+    userId?: string;
+  };
+};
+
 type OmadaClientListPayload = {
   data?: OmadaClientSnapshot[] | { data?: OmadaClientSnapshot[] };
   errorCode?: number;
@@ -148,7 +170,7 @@ type OmadaClientListPayload = {
   result?: OmadaClientSnapshot[] | { data?: OmadaClientSnapshot[] };
 };
 
-async function loginOmada(client: OmadaClient) {
+async function loginOmada(client: OmadaClient): Promise<OmadaSession> {
   const url = new URL(`/${client.config.controllerId}/api/v2/login`, client.config.apiBaseUrl);
   const response = await fetch(url, {
     body: JSON.stringify({
@@ -170,23 +192,37 @@ async function loginOmada(client: OmadaClient) {
     throw new Error(`Omada login failed: ${redactOmadaError(payload.msg ?? response.statusText)}`);
   }
 
-  return payload.result.token;
+  const session: OmadaSession = {
+    cookie: readSetCookie(response),
+    token: payload.result.token
+  };
+
+  return hydrateOmadaSession(client, session);
 }
 
 async function fetchOmadaJson<T>(
   client: OmadaClient,
   url: URL,
-  token: string,
+  session: OmadaSession,
   options: { body?: unknown; method?: "GET" | "POST" } = {}
 ): Promise<T> {
+  const headers: Record<string, string> = {
+    Accept: "application/json, text/plain, */*",
+    "Content-Type": "application/json;charset=UTF-8",
+    "Csrf-Token": session.token,
+    "Omada-Request-Source": "web-local",
+    Origin: client.config.cloudPortalUrl ?? url.origin,
+    Referer: `${client.config.cloudPortalUrl ?? url.origin}/`,
+    "Service-Worker": "true",
+    "Service-Worker-Cache-Then-Network": "true",
+    "X-Requested-With": "XMLHttpRequest"
+  };
+  if (session.cookie) headers.Cookie = session.cookie;
+  if (session.userId) headers["User-Id"] = session.userId;
+
   const response = await fetch(url, {
     body: options.body ? JSON.stringify(options.body) : undefined,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      "Csrf-Token": token
-    },
+    headers,
     method: options.method ?? "GET",
     next: {
       revalidate: 0
@@ -204,6 +240,35 @@ async function fetchOmadaJson<T>(
   return payload;
 }
 
+async function hydrateOmadaSession(client: OmadaClient, session: OmadaSession): Promise<OmadaSession> {
+  const url = new URL(`/${client.config.controllerId}/api/v2/current/user/init-info`, client.config.apiBaseUrl);
+  const headers: Record<string, string> = {
+    Accept: "application/json, text/plain, */*",
+    "Content-Type": "application/json;charset=UTF-8",
+    "Csrf-Token": session.token,
+    "X-Requested-With": "XMLHttpRequest"
+  };
+  if (session.cookie) headers.Cookie = session.cookie;
+
+  const response = await fetch(url, {
+    headers,
+    method: "GET",
+    next: {
+      revalidate: 0
+    }
+  });
+
+  const payload = await readJson<OmadaInitInfoPayload>(response);
+  if (!response.ok || (typeof payload.errorCode === "number" && payload.errorCode !== 0)) {
+    return session;
+  }
+
+  return {
+    ...session,
+    userId: payload.result?.userId
+  };
+}
+
 async function readJson<T>(response: Response): Promise<T> {
   const text = await response.text();
   try {
@@ -211,6 +276,16 @@ async function readJson<T>(response: Response): Promise<T> {
   } catch {
     throw new Error(`Omada API returned non-JSON response: ${redactOmadaError(text.slice(0, 120))}`);
   }
+}
+
+function readSetCookie(response: Response) {
+  const anyHeaders = response.headers as Headers & {
+    getSetCookie?: () => string[];
+  };
+  const cookies = anyHeaders.getSetCookie?.() ?? [];
+  const fallback = response.headers.get("set-cookie");
+  const values = cookies.length ? cookies : fallback ? [fallback] : [];
+  return values.map((cookie) => cookie.split(";")[0]).filter(Boolean).join("; ");
 }
 
 function readOmadaRows(payload: OmadaClientListPayload): OmadaClientSnapshot[] {

@@ -196,15 +196,24 @@ Current browser recon notes:
 - The console uses a controller/org path segment before `/api/v2`.
 - Browser resource traces confirmed API paths such as `/api/v2/sites/{siteId}/site/workspace`, `/api/v2/sites/{siteId}/dashboard/activeSsids`, and OpenAPI dashboard routes such as `/openapi/v1/{controllerId}/sites/{siteId}/dashboard/active-clients`.
 - Fresh Clients-table tracing showed the current Essentials client list route is `POST /openapi/v2/{controllerId}/sites/{siteId}/clients`.
+- A saved browser HAR confirmed successful client-list requests use the web-console session convention:
+  - no `Authorization: Bearer ...` header on the OpenAPI client request
+  - `Csrf-Token` from the Omada login/session token
+  - `User-Id` from `/{controllerId}/api/v2/current/user/init-info` when available
+  - `X-Requested-With: XMLHttpRequest`
+  - `Omada-Request-Source: web-local`
+  - body fields: `filters.active=true`, empty `sorts`, `hideHealthUnsupported=true`, `page`, `pageSize`, and `scope=1`
 - Earlier bundle recon showed a legacy/alternate current clients path under `/{controllerId}/api/v2/sites/{siteId}/insight/clients`; keep this as a fallback candidate only.
 - Live shell probe with the 1Password credentials confirmed `/{controllerId}/api/v2/login` succeeds and returns an Omada token.
-- Calling OpenAPI endpoints directly after login still returned Omada authorization failures (`401` / `-44116`) unless the console's internal OpenAPI request helper is used. The remaining live-connector task is to reproduce the console's OpenAPI authorization headers/session convention.
+- Calling OpenAPI endpoints with an ordinary Bearer token returned Omada authorization failures (`401` / `-44116`). The connector should mimic the console's session headers rather than treating OpenAPI as a plain Bearer-token API.
+- After matching the HAR convention, a private live test against the Seattle Essentials site returned current active client observations through WhoFi's normalized Omada route.
 - Related actions exist for block/unblock/delete client and past connection/portal-auth history, but MVP should stay read-only.
 
 Expected server-side config:
 
 - `OMADA_SERVICE_TIER`: `essentials` for the free route; `standard` only when intentionally using a licensed org.
 - `OMADA_API_BASE_URL`: Essential Controller API host, e.g. regional Omada Essential Controller API base URL.
+- `OMADA_CLOUD_PORTAL_URL`: Omada Cloud browser portal origin used as the OpenAPI request origin/referer.
 - `OMADA_CONTROLLER_ID`: the Omada controller/org id path segment used before `/api/v2`.
 - `OMADA_SITE_ID`: selected site id, such as Seattle or Redmond once mapped.
 - `OMADA_SITE_NAME`: optional display name for operator clarity.

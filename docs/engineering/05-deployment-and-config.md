@@ -88,6 +88,7 @@ network_providers:
     config:
       service_tier: "${OMADA_SERVICE_TIER:-essentials}"
       api_base_url: "${OMADA_API_BASE_URL}"
+      cloud_portal_url: "${OMADA_CLOUD_PORTAL_URL}"
       controller_id: "${OMADA_CONTROLLER_ID}"
       site_id: "${OMADA_SITE_ID}"
       site_name: "${OMADA_SITE_NAME}"
