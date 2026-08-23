@@ -29,6 +29,7 @@ import { formatBytes, formatRelativeTime, percent } from "@/lib/format";
 import { integrationCatalog, type IntegrationCatalogItem } from "@/lib/integrations/catalog";
 import { resolveDevices, type DeviceResolution } from "@/lib/resolution";
 import { buildSessionSnapshot, type SessionSnapshot, type UsageRollup, type UsageRollupDimension } from "@/lib/session-rollups";
+import { createSnapshotHistoryEntry, type SnapshotHistoryEntry } from "@/lib/snapshot-history";
 import type { Alert, AlertStatus, Device, DeviceStatus, Profile, RiskState } from "@/lib/types";
 
 type View = "dashboard" | "devices" | "usage" | "profiles" | "alerts" | "settings";
@@ -117,19 +118,6 @@ type AdminAuthState = {
   configured: boolean;
   enabled: boolean;
   loaded: boolean;
-};
-
-type SnapshotHistoryEntry = {
-  id: string;
-  observedAt: string;
-  onlineDevices: number;
-  reviewSignals: number;
-  source: DeviceSnapshotSource;
-  topAp?: string;
-  topLocation?: string;
-  topSsid?: string;
-  totalBytes: number;
-  unknownDevices: number;
 };
 
 type ReviewState = {
@@ -449,6 +437,28 @@ export default function Home() {
     };
   }, [adminAuth.authenticated, adminAuth.enabled, adminAuth.loaded]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!adminAuth.loaded || (adminAuth.enabled && !adminAuth.authenticated)) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    fetch("/api/snapshot-history")
+      .then((response) => response.json())
+      .then((payload) => {
+        if (cancelled || !Array.isArray(payload.entries)) return;
+        setSnapshotHistory((current) => mergeSnapshotHistory(payload.entries, current).slice(0, 10));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adminAuth.authenticated, adminAuth.enabled, adminAuth.loaded]);
+
   const devices = useMemo(() => {
     return sourceDevices.map((device) => ({
       ...device,
@@ -512,6 +522,18 @@ export default function Home() {
     setSnapshotHistory((current) => [entry, ...current].slice(0, 10));
   };
 
+  const clearSnapshotHistory = async () => {
+    try {
+      const response = await fetch("/api/snapshot-history", { method: "DELETE" });
+      if (!response.ok) throw new Error("History clear failed");
+      setSnapshotHistory([]);
+      setNotice("History cleared");
+      addActivity(setActivity, "Cleared snapshot history");
+    } catch {
+      setNotice("History clear failed");
+    }
+  };
+
   const loadDeviceSource = async (source: DeviceSnapshotSource) => {
     setSourceState({
       message: "Loading",
@@ -551,6 +573,8 @@ export default function Home() {
       const payload = (await response.json()) as {
         devices?: Device[];
         error?: string;
+        observedAt?: string;
+        snapshotHistory?: SnapshotHistoryEntry[];
         source?: DeviceSnapshotSource;
         verificationClient?: DeviceSnapshotVerification;
       };
@@ -561,9 +585,13 @@ export default function Home() {
       setDeviceSnapshotSource(source);
       setSourceDevices(payload.devices);
       setSelectedDeviceId(payload.devices[0]?.id ?? "");
-      const observedAt = new Date().toISOString();
+      const observedAt = payload.observedAt ?? new Date().toISOString();
       setSnapshotObservedAt(observedAt);
-      recordSnapshotHistory(source, payload.devices, observedAt);
+      if (payload.snapshotHistory?.length) {
+        setSnapshotHistory((current) => mergeSnapshotHistory(payload.snapshotHistory ?? [], current).slice(0, 10));
+      } else {
+        recordSnapshotHistory(source, payload.devices, observedAt);
+      }
       setSourceState({
         message: formatSourceStateMessage(payload.devices.length, payload.verificationClient),
         status: "success",
@@ -828,7 +856,11 @@ export default function Home() {
           />
         ) : null}
         {activeView === "usage" ? (
-          <UsageView sessionSnapshot={sessionSnapshot} snapshotHistory={snapshotHistory} />
+          <UsageView
+            onClearSnapshotHistory={clearSnapshotHistory}
+            sessionSnapshot={sessionSnapshot}
+            snapshotHistory={snapshotHistory}
+          />
         ) : null}
         {activeView === "profiles" ? <ProfilesView profiles={demoProfiles} /> : null}
         {activeView === "alerts" ? <AlertsView alerts={alerts} onSetAlertStatus={setAlertStatus} /> : null}
@@ -1094,9 +1126,11 @@ function DevicesView({
 }
 
 function UsageView({
+  onClearSnapshotHistory,
   sessionSnapshot,
   snapshotHistory
 }: {
+  onClearSnapshotHistory: () => void;
   sessionSnapshot: SessionSnapshot;
   snapshotHistory: SnapshotHistoryEntry[];
 }) {
@@ -1133,7 +1167,7 @@ function UsageView({
           </div>
         </div>
 
-        <SnapshotHistoryPanel entries={snapshotHistory} />
+        <SnapshotHistoryPanel entries={snapshotHistory} onClear={onClearSnapshotHistory} />
       </div>
 
       <div className="usage-rollup-grid">
@@ -1201,7 +1235,13 @@ function UsageRollupPanel({
   );
 }
 
-function SnapshotHistoryPanel({ entries }: { entries: SnapshotHistoryEntry[] }) {
+function SnapshotHistoryPanel({
+  entries,
+  onClear
+}: {
+  entries: SnapshotHistoryEntry[];
+  onClear: () => void;
+}) {
   const visibleEntries = entries.slice(0, 8);
 
   return (
@@ -1211,6 +1251,9 @@ function SnapshotHistoryPanel({ entries }: { entries: SnapshotHistoryEntry[] }) 
           <h3>Snapshot History</h3>
           <p>{visibleEntries.length} recent captures.</p>
         </div>
+        <button className="text-button slim" disabled={entries.length === 0} onClick={onClear}>
+          Clear
+        </button>
       </div>
       <div className="list">
         {visibleEntries.map((entry, index) => {
@@ -2371,34 +2414,18 @@ function getDeviceSourceTitle(source: DeviceSnapshotSource, liveSourceAccess: Li
   return `Load ${formatDeviceSourceLabel(source)} devices`;
 }
 
-function createSnapshotHistoryEntry(
-  source: DeviceSnapshotSource,
-  devices: Device[],
-  observedAt: string
-): SnapshotHistoryEntry {
-  const sessionSnapshot = buildSessionSnapshot({
-    count: devices.length,
-    devices,
-    observedAt,
-    source
-  });
+function mergeSnapshotHistory(...entrySets: SnapshotHistoryEntry[][]) {
+  const entries = entrySets.flat();
+  const seen = new Set<string>();
 
-  return {
-    id: crypto.randomUUID(),
-    observedAt,
-    onlineDevices: sessionSnapshot.totals.onlineDevices,
-    reviewSignals: sessionSnapshot.totals.reviewSignals,
-    source,
-    topAp: getTopRollupLabel(sessionSnapshot.rollups, "ap"),
-    topLocation: getTopRollupLabel(sessionSnapshot.rollups, "location"),
-    topSsid: getTopRollupLabel(sessionSnapshot.rollups, "ssid"),
-    totalBytes: sessionSnapshot.totals.totalBytes,
-    unknownDevices: sessionSnapshot.totals.unknownDevices
-  };
-}
-
-function getTopRollupLabel(rollups: UsageRollup[], dimension: UsageRollupDimension) {
-  return rollups.find((rollup) => rollup.dimension === dimension)?.label;
+  return entries
+    .sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime())
+    .filter((entry) => {
+      const key = `${entry.source}:${entry.observedAt}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 
 function formatHistoryDelta(delta: number) {

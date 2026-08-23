@@ -6,6 +6,7 @@ import {
   redactDeviceSourceError
 } from "@/lib/device-snapshots";
 import { getAdminAuthStatus } from "@/lib/admin-auth";
+import { appendSnapshotHistory } from "@/lib/snapshot-history-store";
 
 export const runtime = "nodejs";
 
@@ -38,7 +39,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    return NextResponse.json(await loadDeviceSnapshot(source));
+    const snapshot = await loadDeviceSnapshot(source);
+    const snapshotHistory = await appendSnapshotHistory(snapshot);
+    return NextResponse.json({
+      ...snapshot,
+      snapshotHistory
+    });
   } catch (error) {
     const message = error instanceof Error ? redactDeviceSourceError(error.message) : "Device snapshot failed";
     const status = message.includes("required") ? 409 : 502;

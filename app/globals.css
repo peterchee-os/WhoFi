@@ -354,6 +354,18 @@ textarea {
   color: var(--red);
 }
 
+.text-button.slim {
+  min-height: 32px;
+  padding-inline: 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.text-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
