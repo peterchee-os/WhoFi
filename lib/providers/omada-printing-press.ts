@@ -15,6 +15,18 @@ export type OmadaPrintingPressResult = {
   observations: NetworkObservation[];
 };
 
+export type OmadaPrintingPressDoctorCheck = {
+  detail?: string;
+  name: string;
+  status: "fail" | "pass" | "skip" | string;
+};
+
+export type OmadaPrintingPressDoctorResult = {
+  checks: OmadaPrintingPressDoctorCheck[];
+  live: boolean;
+  status: "error" | "ok" | string;
+};
+
 type ObservationEnvelope = {
   observations?: unknown;
 };
@@ -52,6 +64,29 @@ export async function listOmadaPrintingPressObservations(
   };
 }
 
+export async function doctorOmadaPrintingPress(
+  config = getOmadaPrintingPressConfigFromEnv(),
+  env: NodeJS.ProcessEnv = process.env
+): Promise<OmadaPrintingPressDoctorResult> {
+  const args = ["whofi", "doctor", "--live"];
+  const childEnv = buildCliEnv(env);
+
+  let stdout = "";
+  try {
+    const result = await execFileAsync(config.commandPath, args, {
+      env: childEnv,
+      maxBuffer: 1024 * 1024,
+      timeout: config.timeoutMs
+    });
+    stdout = result.stdout;
+  } catch (error) {
+    stdout = readExecStdout(error);
+    if (!stdout) throw error;
+  }
+
+  return parseDoctor(stdout);
+}
+
 function buildCliEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return {
     ...env,
@@ -62,6 +97,40 @@ function buildCliEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     OMADA_ESSENTIAL_SITE_ID: env.OMADA_ESSENTIAL_SITE_ID ?? env.OMADA_SITE_ID,
     OMADA_ESSENTIAL_SITE_NAME: env.OMADA_ESSENTIAL_SITE_NAME ?? env.OMADA_SITE_NAME,
     OMADA_ESSENTIAL_USERNAME: env.OMADA_ESSENTIAL_USERNAME ?? env.OMADA_USERNAME
+  };
+}
+
+function parseDoctor(stdout: string): OmadaPrintingPressDoctorResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    throw new Error("Omada Printing Press doctor returned non-JSON output");
+  }
+
+  if (!isRecord(parsed) || !Array.isArray(parsed.checks) || typeof parsed.status !== "string") {
+    throw new Error("Omada Printing Press doctor returned an unexpected output shape");
+  }
+
+  return {
+    checks: parsed.checks.map(normalizeDoctorCheck),
+    live: typeof parsed.live === "boolean" ? parsed.live : false,
+    status: parsed.status
+  };
+}
+
+function normalizeDoctorCheck(value: unknown): OmadaPrintingPressDoctorCheck {
+  if (!isRecord(value) || typeof value.name !== "string" || typeof value.status !== "string") {
+    return {
+      name: "unknown",
+      status: "fail"
+    };
+  }
+
+  return {
+    detail: readOptionalString(value.detail),
+    name: value.name,
+    status: value.status
   };
 }
 
@@ -120,4 +189,9 @@ function readOptionalString(value: unknown) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function readExecStdout(error: unknown) {
+  if (!isRecord(error)) return "";
+  return typeof error.stdout === "string" ? error.stdout : "";
 }

@@ -942,7 +942,7 @@ function SettingsView({
             </div>
             <div>
               <dt>Last send</dt>
-              <dd>{deliveries[0] ? formatRelativeTime(deliveries[0].createdAt) : "none"}</dd>
+              <dd><RelativeTime value={deliveries[0]?.createdAt} /></dd>
             </div>
           </dl>
         </section>
@@ -1018,7 +1018,7 @@ function SettingsView({
           <tbody>
             {deliveries.map((delivery) => (
               <tr key={delivery.id}>
-                <td>{formatRelativeTime(delivery.createdAt)}</td>
+                <td><RelativeTime value={delivery.createdAt} /></td>
                 <td>{delivery.notificationType}</td>
                 <td>{delivery.recipient}</td>
                 <td>{delivery.provider}</td>
@@ -1153,6 +1153,10 @@ function formatIntegrationStatus(status: IntegrationCatalogItem["status"]) {
   return "planned";
 }
 
+function RelativeTime({ fallback = "none", value }: { fallback?: string; value?: string }) {
+  return <span suppressHydrationWarning>{value ? formatRelativeTime(value) : fallback}</span>;
+}
+
 function NetworkProviderStatus({
   onAddActivity,
   onNotice
@@ -1163,6 +1167,10 @@ function NetworkProviderStatus({
   const [providers, setProviders] = useState<NetworkProviderConfigStatus[]>([]);
   const [compareState, setCompareState] = useState<IntegrationTestState>({
     message: "Not compared",
+    status: "idle"
+  });
+  const [doctorState, setDoctorState] = useState<IntegrationTestState>({
+    message: "Not checked",
     status: "idle"
   });
   const [loaded, setLoaded] = useState(false);
@@ -1189,6 +1197,10 @@ function NetworkProviderStatus({
   }, []);
 
   const compareOmadaConnectors = async () => {
+    setDoctorState({
+      message: "Not checked",
+      status: "idle"
+    });
     setCompareState({
       message: "Comparing",
       status: "testing"
@@ -1227,6 +1239,49 @@ function NetworkProviderStatus({
     }
   };
 
+  const runOmadaDoctor = async () => {
+    setCompareState({
+      message: "Not compared",
+      status: "idle"
+    });
+    setDoctorState({
+      message: "Checking",
+      status: "testing"
+    });
+
+    try {
+      const response = await fetch("/api/observations/omada/cli-doctor");
+      const payload = (await response.json()) as {
+        error?: string;
+        result?: {
+          checks?: Array<{ detail?: string; name: string; status: string }>;
+          status?: string;
+        };
+      };
+      const failedCheck = payload.result?.checks?.find((check) => check.status === "fail");
+      if (!response.ok || payload.result?.status !== "ok") {
+        throw new Error(failedCheck?.detail ?? payload.error ?? "Doctor failed");
+      }
+
+      setDoctorState({
+        message: "Ready",
+        status: "success",
+        testedAt: new Date().toISOString()
+      });
+      onNotice("Omada CLI ready");
+      onAddActivity("Omada Printing Press doctor: Ready");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Doctor failed";
+      setDoctorState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      onNotice("Omada CLI doctor failed");
+      onAddActivity(`Omada Printing Press doctor failed: ${message}`);
+    }
+  };
+
   return (
     <section className="panel">
       <div className="panel-header">
@@ -1258,13 +1313,29 @@ function NetworkProviderStatus({
             </div>
             <div className="provider-status-actions">
               {provider.providerId === "omada-printing-press" && provider.configured ? (
-                <button className="text-button" onClick={compareOmadaConnectors} title="Compare Omada connectors">
-                  <Activity size={17} />
-                  Compare
-                </button>
+                <>
+                  <button className="text-button" onClick={runOmadaDoctor} title="Check Omada CLI readiness">
+                    <ShieldCheck size={17} />
+                    Doctor
+                  </button>
+                  <button className="text-button" onClick={compareOmadaConnectors} title="Compare Omada connectors">
+                    <Activity size={17} />
+                    Compare
+                  </button>
+                </>
               ) : null}
-              <span className={`integration-state ${provider.configured ? "success" : "idle"}`}>
-                {provider.providerId === "omada-printing-press" && compareState.status !== "idle"
+              <span
+                className={`integration-state ${
+                  provider.providerId === "omada-printing-press" && doctorState.status !== "idle"
+                    ? doctorState.status
+                    : provider.providerId === "omada-printing-press" && compareState.status !== "idle"
+                      ? compareState.status
+                      : provider.configured ? "success" : "idle"
+                }`}
+              >
+                {provider.providerId === "omada-printing-press" && doctorState.status !== "idle"
+                  ? doctorState.message
+                  : provider.providerId === "omada-printing-press" && compareState.status !== "idle"
                   ? compareState.message
                   : provider.configured ? "Configured" : "Missing"}
               </span>
@@ -1406,7 +1477,7 @@ function DeviceLedger({
                 <td>
                   <div className="device-name">
                     <strong>{device.hostname}</strong>
-                    <span>{device.mac} · {formatRelativeTime(device.lastSeen)}</span>
+                    <span>{device.mac} · <RelativeTime value={device.lastSeen} /></span>
                   </div>
                 </td>
                 <td>
@@ -1538,7 +1609,7 @@ function DeviceInspector({
           </div>
           <div>
             <dt>Last seen</dt>
-            <dd>{formatRelativeTime(device.lastSeen)}</dd>
+            <dd><RelativeTime value={device.lastSeen} /></dd>
           </div>
         </dl>
 
@@ -1629,7 +1700,7 @@ function AlertQueue({
             </div>
             <p>{alert.details}</p>
             <div className="inline-actions">
-              <span>{alert.status} · {formatRelativeTime(alert.openedAt)}</span>
+              <span>{alert.status} · <RelativeTime value={alert.openedAt} /></span>
               {alert.status !== "acknowledged" ? (
                 <button onClick={() => onSetAlertStatus(alert.id, "acknowledged")}>Acknowledge</button>
               ) : null}
@@ -1660,7 +1731,7 @@ function ActivityLog({ activity }: { activity: ActivityEntry[] }) {
             <div className="list-title">
               <strong>{entry.message}</strong>
             </div>
-            <p>{formatRelativeTime(entry.timestamp)}</p>
+            <p><RelativeTime value={entry.timestamp} /></p>
           </div>
         ))}
       </div>

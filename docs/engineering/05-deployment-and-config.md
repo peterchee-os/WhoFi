@@ -188,6 +188,7 @@ Public repo examples can include fake values and `.env.example` entries. Real op
 Current implementation state:
 
 - `GET /api/providers/network/status` reports Omada and Cisco Meraki config readiness from server-side env vars.
+- `GET /api/observations/omada/cli-doctor` runs the optional Omada Printing Press CLI readiness check and returns only check names/statuses.
 - Omada should default to `OMADA_SERVICE_TIER=essentials`; Standard/licensed should be opt-in, not implied by the first setup path.
 - Settings shows whether required env vars are present.
 - The endpoint returns missing env var names only, never secret values.

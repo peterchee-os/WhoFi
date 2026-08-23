@@ -41,6 +41,7 @@ Returns one fake provider client payload normalized into a WhoFi observation.
 
 ```text
 GET /api/observations/meraki/test
+GET /api/observations/omada/cli-doctor
 GET /api/observations/omada/cli-test
 GET /api/observations/omada/compare
 GET /api/observations/omada/test
@@ -51,6 +52,8 @@ Uses server-side `MERAKI_API_KEY` and `MERAKI_NETWORK_ID` to fetch recent client
 The Omada test endpoint uses server-side Omada credentials and Essentials controller metadata to fetch current active clients. It returns `409` when required env vars are missing. Never expose Omada credentials, session tokens, cookies, or raw HAR headers in responses or logs.
 
 The Omada CLI test endpoint runs an optional Printing Press generated CLI when `OMADA_PP_CLI_PATH` is configured. It is for private deployment smoke tests and connector comparison. The generated CLI is not vendored into the public WhoFi repo.
+
+The Omada CLI doctor endpoint runs the optional Printing Press CLI `whofi doctor --live` command. It returns readiness checks only, never observations, MACs, IPs, names, or raw controller payloads.
 
 The Omada compare endpoint calls both the TypeScript connector and the optional Printing Press CLI bridge, then returns counts and match status only. It intentionally does not return observations, MACs, IPs, names, or raw controller payloads.
 
