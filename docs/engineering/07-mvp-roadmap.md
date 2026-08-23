@@ -59,7 +59,7 @@ Current implementation:
 
 - `GET /api/devices` returns selected-source device snapshots for demo, Omada, or optional Omada Printing Press CLI.
 - `GET /api/sessions` returns aggregate usage rollups from the selected source by location, SSID, and AP.
-- The dashboard Usage view renders current snapshot totals, rollups, and recent snapshot history.
+- The dashboard Usage view renders current snapshot totals, rollups, recent snapshot history, and stored capture detail.
 - API-loaded device snapshots append summary rows and bounded full captures to a local `.whofi/snapshot-history.json` audit file as a bridge toward database persistence.
 - Live Omada snapshots require `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true` and optionally `WHOFI_LIVE_DEVICE_SOURCE_TOKEN`.
 - Hosted/live-network deployments can require app-level admin sign-in with `WHOFI_REQUIRE_ADMIN_AUTH=true`.

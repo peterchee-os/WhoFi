@@ -1,19 +1,15 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { DeviceSnapshot } from "./device-ledger";
-import { buildSessionSnapshot, type SessionSnapshot } from "./session-rollups";
-import { createSnapshotHistoryEntry, type SnapshotHistoryEntry } from "./snapshot-history";
+import { buildSessionSnapshot } from "./session-rollups";
+import {
+  createSnapshotHistoryEntry,
+  type SnapshotCaptureRecord,
+  type SnapshotHistoryEntry
+} from "./snapshot-history";
 
 const defaultCaptureLimit = 25;
 const defaultHistoryLimit = 100;
-
-export type SnapshotCaptureRecord = {
-  capturedAt: string;
-  deviceSnapshot: DeviceSnapshot;
-  id: string;
-  sessionSnapshot: SessionSnapshot;
-  summary: SnapshotHistoryEntry;
-};
 
 type SnapshotHistoryFile = {
   captures: SnapshotCaptureRecord[];

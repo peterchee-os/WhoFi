@@ -29,7 +29,11 @@ import { formatBytes, formatRelativeTime, percent } from "@/lib/format";
 import { integrationCatalog, type IntegrationCatalogItem } from "@/lib/integrations/catalog";
 import { resolveDevices, type DeviceResolution } from "@/lib/resolution";
 import { buildSessionSnapshot, type SessionSnapshot, type UsageRollup, type UsageRollupDimension } from "@/lib/session-rollups";
-import { createSnapshotHistoryEntry, type SnapshotHistoryEntry } from "@/lib/snapshot-history";
+import {
+  createSnapshotHistoryEntry,
+  type SnapshotCaptureRecord,
+  type SnapshotHistoryEntry
+} from "@/lib/snapshot-history";
 import type { Alert, AlertStatus, Device, DeviceStatus, Profile, RiskState } from "@/lib/types";
 
 type View = "dashboard" | "devices" | "usage" | "profiles" | "alerts" | "settings";
@@ -272,6 +276,13 @@ export default function Home() {
   const [deviceSnapshotSource, setDeviceSnapshotSource] = useState<DeviceSnapshotSource>("demo");
   const [liveSourceToken, setLiveSourceToken] = useState("");
   const [snapshotObservedAt, setSnapshotObservedAt] = useState(new Date().toISOString());
+  const [selectedSnapshotCapture, setSelectedSnapshotCapture] = useState<SnapshotCaptureRecord>();
+  const [selectedSnapshotCaptureId, setSelectedSnapshotCaptureId] = useState("");
+  const [persistedSnapshotCaptureIds, setPersistedSnapshotCaptureIds] = useState<string[]>([]);
+  const [snapshotCaptureState, setSnapshotCaptureState] = useState<IntegrationTestState>({
+    message: "No capture selected",
+    status: "idle"
+  });
   const [adminAuth, setAdminAuth] = useState<AdminAuthState>({
     authenticated: false,
     configured: false,
@@ -450,7 +461,10 @@ export default function Home() {
       .then((response) => response.json())
       .then((payload) => {
         if (cancelled || !Array.isArray(payload.entries)) return;
-        setSnapshotHistory((current) => mergeSnapshotHistory(payload.entries, current).slice(0, 10));
+        setPersistedSnapshotCaptureIds(payload.entries.map((entry: SnapshotHistoryEntry) => entry.id));
+        setSnapshotHistory((current) => payload.entries.length
+          ? mergeSnapshotHistory(payload.entries).slice(0, 10)
+          : current);
       })
       .catch(() => undefined);
 
@@ -526,11 +540,51 @@ export default function Home() {
     try {
       const response = await fetch("/api/snapshot-history", { method: "DELETE" });
       if (!response.ok) throw new Error("History clear failed");
+      setPersistedSnapshotCaptureIds([]);
       setSnapshotHistory([]);
+      setSelectedSnapshotCapture(undefined);
+      setSelectedSnapshotCaptureId("");
+      setSnapshotCaptureState({
+        message: "No capture selected",
+        status: "idle"
+      });
       setNotice("History cleared");
       addActivity(setActivity, "Cleared snapshot history");
     } catch {
       setNotice("History clear failed");
+    }
+  };
+
+  const loadSnapshotCapture = async (entryId: string) => {
+    setSelectedSnapshotCaptureId(entryId);
+    setSnapshotCaptureState({
+      message: "Loading capture",
+      status: "testing"
+    });
+
+    try {
+      const response = await fetch(`/api/snapshot-history/${encodeURIComponent(entryId)}`);
+      const payload = (await response.json()) as { capture?: SnapshotCaptureRecord; error?: string };
+      if (!response.ok || !payload.capture) {
+        throw new Error(payload.error ?? "Capture load failed");
+      }
+
+      setSelectedSnapshotCapture(payload.capture);
+      setSnapshotCaptureState({
+        message: "Capture loaded",
+        status: "success",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Capture loaded");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Capture load failed";
+      setSelectedSnapshotCapture(undefined);
+      setSnapshotCaptureState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Capture load failed");
     }
   };
 
@@ -588,6 +642,7 @@ export default function Home() {
       const observedAt = payload.observedAt ?? new Date().toISOString();
       setSnapshotObservedAt(observedAt);
       if (payload.snapshotHistory?.length) {
+        setPersistedSnapshotCaptureIds(payload.snapshotHistory.map((entry) => entry.id));
         setSnapshotHistory((current) => mergeSnapshotHistory(payload.snapshotHistory ?? [], current).slice(0, 10));
       } else {
         recordSnapshotHistory(source, payload.devices, observedAt);
@@ -858,7 +913,12 @@ export default function Home() {
         {activeView === "usage" ? (
           <UsageView
             onClearSnapshotHistory={clearSnapshotHistory}
+            onLoadSnapshotCapture={loadSnapshotCapture}
+            persistedSnapshotCaptureIds={persistedSnapshotCaptureIds}
+            selectedSnapshotCapture={selectedSnapshotCapture}
+            selectedSnapshotCaptureId={selectedSnapshotCaptureId}
             sessionSnapshot={sessionSnapshot}
+            snapshotCaptureState={snapshotCaptureState}
             snapshotHistory={snapshotHistory}
           />
         ) : null}
@@ -1127,11 +1187,21 @@ function DevicesView({
 
 function UsageView({
   onClearSnapshotHistory,
+  onLoadSnapshotCapture,
+  persistedSnapshotCaptureIds,
+  selectedSnapshotCapture,
+  selectedSnapshotCaptureId,
   sessionSnapshot,
+  snapshotCaptureState,
   snapshotHistory
 }: {
   onClearSnapshotHistory: () => void;
+  onLoadSnapshotCapture: (entryId: string) => void;
+  persistedSnapshotCaptureIds: string[];
+  selectedSnapshotCapture?: SnapshotCaptureRecord;
+  selectedSnapshotCaptureId: string;
   sessionSnapshot: SessionSnapshot;
+  snapshotCaptureState: IntegrationTestState;
   snapshotHistory: SnapshotHistoryEntry[];
 }) {
   const maxRollupBytes = Math.max(0, ...sessionSnapshot.rollups.map((rollup) => rollup.totalBytes));
@@ -1167,10 +1237,17 @@ function UsageView({
           </div>
         </div>
 
-        <SnapshotHistoryPanel entries={snapshotHistory} onClear={onClearSnapshotHistory} />
+        <SnapshotHistoryPanel
+          entries={snapshotHistory}
+          onClear={onClearSnapshotHistory}
+          onLoadCapture={onLoadSnapshotCapture}
+          persistedEntryIds={persistedSnapshotCaptureIds}
+          selectedEntryId={selectedSnapshotCaptureId}
+        />
       </div>
 
       <div className="usage-rollup-grid">
+        <SnapshotCapturePanel capture={selectedSnapshotCapture} state={snapshotCaptureState} />
         <UsageRollupPanel
           dimension="location"
           maxBytes={maxRollupBytes}
@@ -1235,14 +1312,89 @@ function UsageRollupPanel({
   );
 }
 
+function SnapshotCapturePanel({
+  capture,
+  state
+}: {
+  capture?: SnapshotCaptureRecord;
+  state: IntegrationTestState;
+}) {
+  const topDevices = capture
+    ? [...capture.deviceSnapshot.devices]
+        .sort((a, b) => b.rxBytes + b.txBytes - (a.rxBytes + a.txBytes))
+        .slice(0, 4)
+    : [];
+
+  return (
+    <div className="panel">
+      <div className="panel-header">
+        <div>
+          <h3>Capture Detail</h3>
+          <p>
+            {capture
+              ? `${formatDeviceSourceLabel(capture.summary.source)} · ${capture.summary.onlineDevices} devices · `
+              : "Select a capture from history."}
+            {capture ? <RelativeTime value={capture.summary.observedAt} /> : null}
+          </p>
+        </div>
+        <span className={`integration-state ${state.status}`}>{state.message}</span>
+      </div>
+      {capture ? (
+        <>
+          <div className="usage-summary capture-summary">
+            <div>
+              <span>Total usage</span>
+              <strong>{formatBytes(capture.summary.totalBytes)}</strong>
+            </div>
+            <div>
+              <span>Unknown</span>
+              <strong>{capture.summary.unknownDevices}</strong>
+            </div>
+            <div>
+              <span>Review signals</span>
+              <strong>{capture.summary.reviewSignals}</strong>
+            </div>
+            <div>
+              <span>Rollups</span>
+              <strong>{capture.sessionSnapshot.rollups.length}</strong>
+            </div>
+          </div>
+          <div className="list">
+            {topDevices.map((device) => (
+              <div className="list-item compact-item" key={device.id}>
+                <div className="list-title">
+                  <strong className="truncate">{device.hostname}</strong>
+                  <span className="metric-pill">{formatBytes(device.rxBytes + device.txBytes)}</span>
+                </div>
+                <p className="truncate">{device.ssid} · {device.apName} · {device.status}</p>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="list-item">
+          <p>Stored captures include the device snapshot and session rollups for later audit.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SnapshotHistoryPanel({
   entries,
-  onClear
+  onClear,
+  onLoadCapture,
+  persistedEntryIds,
+  selectedEntryId
 }: {
   entries: SnapshotHistoryEntry[];
   onClear: () => void;
+  onLoadCapture: (entryId: string) => void;
+  persistedEntryIds: string[];
+  selectedEntryId: string;
 }) {
   const visibleEntries = entries.slice(0, 8);
+  const persistedEntryIdSet = new Set(persistedEntryIds);
 
   return (
     <div className="panel">
@@ -1259,9 +1411,17 @@ function SnapshotHistoryPanel({
         {visibleEntries.map((entry, index) => {
           const previous = entries[index + 1];
           const delta = previous ? entry.totalBytes - previous.totalBytes : 0;
+          const persisted = persistedEntryIdSet.has(entry.id);
 
           return (
-            <div className="list-item compact-item snapshot-history-row" key={entry.id}>
+            <button
+              className={`list-item compact-item snapshot-history-row history-button ${selectedEntryId === entry.id ? "selected" : ""}`}
+              disabled={!persisted}
+              key={entry.id}
+              onClick={() => onLoadCapture(entry.id)}
+              title={persisted ? "Inspect stored capture" : "Local-only row has no stored capture detail"}
+              type="button"
+            >
               <div className="list-title">
                 <strong>{formatDeviceSourceLabel(entry.source)}</strong>
                 <span className={`metric-pill ${delta > 0 ? "up" : delta < 0 ? "down" : ""}`}>
@@ -1272,8 +1432,8 @@ function SnapshotHistoryPanel({
                 {formatBytes(entry.totalBytes)} · {entry.onlineDevices} devices · {entry.unknownDevices} unknown
               </p>
               <p className="truncate">Top: {formatHistoryTop(entry)}</p>
-              <p><RelativeTime value={entry.observedAt} /></p>
-            </div>
+              <p>{persisted ? "Stored capture" : "Local only"} · <RelativeTime value={entry.observedAt} /></p>
+            </button>
           );
         })}
       </div>

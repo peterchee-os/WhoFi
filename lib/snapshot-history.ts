@@ -1,5 +1,6 @@
 import { buildSessionSnapshot, type UsageRollup, type UsageRollupDimension } from "./session-rollups";
-import type { DeviceSource } from "./device-ledger";
+import type { DeviceSnapshot, DeviceSource } from "./device-ledger";
+import type { SessionSnapshot } from "./session-rollups";
 import type { Device } from "./types";
 
 export type SnapshotHistoryEntry = {
@@ -13,6 +14,14 @@ export type SnapshotHistoryEntry = {
   topSsid?: string;
   totalBytes: number;
   unknownDevices: number;
+};
+
+export type SnapshotCaptureRecord = {
+  capturedAt: string;
+  deviceSnapshot: DeviceSnapshot;
+  id: string;
+  sessionSnapshot: SessionSnapshot;
+  summary: SnapshotHistoryEntry;
 };
 
 export function createSnapshotHistoryEntry(

@@ -46,7 +46,7 @@ WhoFi should support:
 - hosted/self-hosted production mode with a persistent database, scheduled collectors, alerts, and optional captive portal
 - optional collector mode for networks where the WiFi controller is only reachable from inside the coworking LAN
 
-The current demo app includes device review, source switching, notification settings, provider readiness, usage rollups by location/SSID/AP, local snapshot audit history, and optional admin authentication for hosted/live-network use.
+The current demo app includes device review, source switching, notification settings, provider readiness, usage rollups by location/SSID/AP, selectable local snapshot audit history, and optional admin authentication for hosted/live-network use.
 
 ## Admin Gate
 
@@ -68,7 +68,7 @@ API-loaded device snapshots append summaries and bounded full captures to a loca
 .whofi/snapshot-history.json
 ```
 
-Set `WHOFI_SNAPSHOT_HISTORY_PATH` to move that file. `GET /api/snapshot-history` returns summaries, `GET /api/snapshot-history?include=captures` includes recent full captures, and `GET /api/snapshot-history/{id}` returns one capture. This is a development/demo bridge toward database-backed, tenant-scoped observation and session persistence; `.whofi/` is ignored by git.
+Set `WHOFI_SNAPSHOT_HISTORY_PATH` to move that file. `GET /api/snapshot-history` returns summaries, `GET /api/snapshot-history?include=captures` includes recent full captures, and `GET /api/snapshot-history/{id}` returns one capture. The Usage tab can inspect stored captures and show their saved totals, rollups, and top devices. This is a development/demo bridge toward database-backed, tenant-scoped observation and session persistence; `.whofi/` is ignored by git.
 
 ## Repository Principle
 
