@@ -98,6 +98,14 @@ identity_providers:
     config:
       base_url: "${YARDI_KUBE_BASE_URL}"
       api_key: "${YARDI_KUBE_API_KEY}"
+  - id: "officernd"
+    type: "officernd"
+    display_name: "OfficeRnD"
+    config:
+      org: "${OFFICERND_ORG}"
+      client_id: "${OFFICERND_CLIENT_ID}"
+      client_secret: "${OFFICERND_CLIENT_SECRET}"
+      webhook_signing_secret: "${OFFICERND_WEBHOOK_SIGNING_SECRET}"
 
 locations:
   - id: "main"
@@ -132,6 +140,36 @@ notifications:
   operator_digest_recipients:
     - "ops@example-coworking.test"
 ```
+
+## Integration Config Strategy
+
+WhoFi should use generic config loading but exact integration modules.
+
+Good:
+
+```text
+config loader
+  -> identity/officernd module
+  -> identity/yardi module
+  -> network/omada module
+```
+
+Avoid:
+
+```text
+one generic "coworking API" module with arbitrary fields
+```
+
+Each production integration should have:
+
+- exact integration type
+- exact config schema
+- exact admin card
+- exact test connection route
+- exact sync/webhook handlers when needed
+- normalized output into WhoFi profiles, entitlements, locations, and observations
+
+Public repo examples can include fake values and `.env.example` entries. Real operator config belongs in private deployment config or deployment secret storage.
 
 ## Public Repo Files
 
