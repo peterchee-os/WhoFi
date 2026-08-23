@@ -31,6 +31,7 @@ import { resolveDevices, type DeviceResolution } from "@/lib/resolution";
 import { buildSessionSnapshot, type SessionSnapshot, type UsageRollup, type UsageRollupDimension } from "@/lib/session-rollups";
 import {
   createSnapshotHistoryEntry,
+  type SnapshotCaptureComparison,
   type SnapshotCaptureRecord,
   type SnapshotHistoryEntry
 } from "@/lib/snapshot-history";
@@ -276,6 +277,7 @@ export default function Home() {
   const [deviceSnapshotSource, setDeviceSnapshotSource] = useState<DeviceSnapshotSource>("demo");
   const [liveSourceToken, setLiveSourceToken] = useState("");
   const [snapshotObservedAt, setSnapshotObservedAt] = useState(new Date().toISOString());
+  const [selectedSnapshotComparison, setSelectedSnapshotComparison] = useState<SnapshotCaptureComparison>();
   const [selectedSnapshotCapture, setSelectedSnapshotCapture] = useState<SnapshotCaptureRecord>();
   const [selectedSnapshotCaptureId, setSelectedSnapshotCaptureId] = useState("");
   const [persistedSnapshotCaptureIds, setPersistedSnapshotCaptureIds] = useState<string[]>([]);
@@ -542,6 +544,7 @@ export default function Home() {
       if (!response.ok) throw new Error("History clear failed");
       setPersistedSnapshotCaptureIds([]);
       setSnapshotHistory([]);
+      setSelectedSnapshotComparison(undefined);
       setSelectedSnapshotCapture(undefined);
       setSelectedSnapshotCaptureId("");
       setSnapshotCaptureState({
@@ -564,11 +567,16 @@ export default function Home() {
 
     try {
       const response = await fetch(`/api/snapshot-history/${encodeURIComponent(entryId)}`);
-      const payload = (await response.json()) as { capture?: SnapshotCaptureRecord; error?: string };
+      const payload = (await response.json()) as {
+        capture?: SnapshotCaptureRecord;
+        comparison?: SnapshotCaptureComparison;
+        error?: string;
+      };
       if (!response.ok || !payload.capture) {
         throw new Error(payload.error ?? "Capture load failed");
       }
 
+      setSelectedSnapshotComparison(payload.comparison);
       setSelectedSnapshotCapture(payload.capture);
       setSnapshotCaptureState({
         message: "Capture loaded",
@@ -578,6 +586,7 @@ export default function Home() {
       setNotice("Capture loaded");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Capture load failed";
+      setSelectedSnapshotComparison(undefined);
       setSelectedSnapshotCapture(undefined);
       setSnapshotCaptureState({
         message,
@@ -902,6 +911,7 @@ export default function Home() {
             onClearSnapshotHistory={clearSnapshotHistory}
             onLoadSnapshotCapture={loadSnapshotCapture}
             persistedSnapshotCaptureIds={persistedSnapshotCaptureIds}
+            selectedSnapshotComparison={selectedSnapshotComparison}
             selectedSnapshotCapture={selectedSnapshotCapture}
             selectedSnapshotCaptureId={selectedSnapshotCaptureId}
             sessionSnapshot={sessionSnapshot}
@@ -1176,6 +1186,7 @@ function UsageView({
   onClearSnapshotHistory,
   onLoadSnapshotCapture,
   persistedSnapshotCaptureIds,
+  selectedSnapshotComparison,
   selectedSnapshotCapture,
   selectedSnapshotCaptureId,
   sessionSnapshot,
@@ -1185,6 +1196,7 @@ function UsageView({
   onClearSnapshotHistory: () => void;
   onLoadSnapshotCapture: (entryId: string) => void;
   persistedSnapshotCaptureIds: string[];
+  selectedSnapshotComparison?: SnapshotCaptureComparison;
   selectedSnapshotCapture?: SnapshotCaptureRecord;
   selectedSnapshotCaptureId: string;
   sessionSnapshot: SessionSnapshot;
@@ -1234,7 +1246,11 @@ function UsageView({
       </div>
 
       <div className="usage-rollup-grid">
-        <SnapshotCapturePanel capture={selectedSnapshotCapture} state={snapshotCaptureState} />
+        <SnapshotCapturePanel
+          capture={selectedSnapshotCapture}
+          comparison={selectedSnapshotComparison}
+          state={snapshotCaptureState}
+        />
         <UsageRollupPanel
           dimension="location"
           maxBytes={maxRollupBytes}
@@ -1301,9 +1317,11 @@ function UsageRollupPanel({
 
 function SnapshotCapturePanel({
   capture,
+  comparison,
   state
 }: {
   capture?: SnapshotCaptureRecord;
+  comparison?: SnapshotCaptureComparison;
   state: IntegrationTestState;
 }) {
   const topDevices = capture
@@ -1346,6 +1364,31 @@ function SnapshotCapturePanel({
               <strong>{capture.sessionSnapshot.rollups.length}</strong>
             </div>
           </div>
+          <div className="comparison-grid">
+            <div>
+              <span>Devices</span>
+              <strong>{comparison ? formatSignedNumber(comparison.deltas.onlineDevices) : "Base"}</strong>
+            </div>
+            <div>
+              <span>Unknown</span>
+              <strong>{comparison ? formatSignedNumber(comparison.deltas.unknownDevices) : "Base"}</strong>
+            </div>
+            <div>
+              <span>Signals</span>
+              <strong>{comparison ? formatSignedNumber(comparison.deltas.reviewSignals) : "Base"}</strong>
+            </div>
+            <div>
+              <span>Usage</span>
+              <strong>{comparison ? formatHistoryDelta(comparison.deltas.totalBytes) : "Base"}</strong>
+            </div>
+          </div>
+          {comparison ? (
+            <p className="comparison-caption">
+              Compared with <RelativeTime value={comparison.previousObservedAt} />.
+            </p>
+          ) : (
+            <p className="comparison-caption">No earlier stored capture for this source.</p>
+          )}
           <div className="list">
             {topDevices.map((device) => (
               <div className="list-item compact-item" key={device.id}>
@@ -2578,6 +2621,12 @@ function mergeSnapshotHistory(...entrySets: SnapshotHistoryEntry[][]) {
 function formatHistoryDelta(delta: number) {
   if (delta > 0) return `+${formatBytes(delta)}`;
   if (delta < 0) return `-${formatBytes(Math.abs(delta))}`;
+  return "Base";
+}
+
+function formatSignedNumber(delta: number) {
+  if (delta > 0) return `+${delta}`;
+  if (delta < 0) return `${delta}`;
   return "Base";
 }
 

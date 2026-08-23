@@ -24,6 +24,39 @@ export type SnapshotCaptureRecord = {
   summary: SnapshotHistoryEntry;
 };
 
+export type SnapshotCaptureComparison = {
+  deltas: {
+    onlineDevices: number;
+    reviewSignals: number;
+    totalBytes: number;
+    totalRxBytes: number;
+    totalTxBytes: number;
+    unknownDevices: number;
+  };
+  previousCapturedAt: string;
+  previousId: string;
+  previousObservedAt: string;
+};
+
+export function buildSnapshotCaptureComparison(
+  current: SnapshotCaptureRecord,
+  previous: SnapshotCaptureRecord
+): SnapshotCaptureComparison {
+  return {
+    deltas: {
+      onlineDevices: current.summary.onlineDevices - previous.summary.onlineDevices,
+      reviewSignals: current.summary.reviewSignals - previous.summary.reviewSignals,
+      totalBytes: current.summary.totalBytes - previous.summary.totalBytes,
+      totalRxBytes: current.sessionSnapshot.totals.totalRxBytes - previous.sessionSnapshot.totals.totalRxBytes,
+      totalTxBytes: current.sessionSnapshot.totals.totalTxBytes - previous.sessionSnapshot.totals.totalTxBytes,
+      unknownDevices: current.summary.unknownDevices - previous.summary.unknownDevices
+    },
+    previousCapturedAt: previous.capturedAt,
+    previousId: previous.id,
+    previousObservedAt: previous.summary.observedAt
+  };
+}
+
 export function createSnapshotHistoryEntry(
   source: DeviceSource,
   devices: Device[],

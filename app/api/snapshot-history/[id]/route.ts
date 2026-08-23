@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuthStatus } from "@/lib/admin-auth";
-import { readSnapshotCapture } from "@/lib/snapshot-history-store";
+import { readSnapshotCaptureDetail } from "@/lib/snapshot-history-store";
 
 export const runtime = "nodejs";
 
@@ -21,8 +21,8 @@ export async function GET(
   }
 
   const { id } = await params;
-  const capture = await readSnapshotCapture(id);
-  if (!capture) {
+  const detail = await readSnapshotCaptureDetail(id);
+  if (!detail) {
     return NextResponse.json(
       {
         error: "Snapshot capture not found"
@@ -34,6 +34,6 @@ export async function GET(
   }
 
   return NextResponse.json({
-    capture
+    ...detail
   });
 }

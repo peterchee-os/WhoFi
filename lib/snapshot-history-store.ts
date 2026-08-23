@@ -3,8 +3,10 @@ import { dirname, join } from "node:path";
 import type { DeviceSnapshot } from "./device-ledger";
 import { buildSessionSnapshot } from "./session-rollups";
 import {
+  buildSnapshotCaptureComparison,
   createSnapshotHistoryEntry,
   type SnapshotCaptureRecord,
+  type SnapshotCaptureComparison,
   type SnapshotHistoryEntry
 } from "./snapshot-history";
 
@@ -48,6 +50,28 @@ export async function readSnapshotCaptures(env: NodeJS.ProcessEnv = process.env)
 export async function readSnapshotCapture(id: string, env: NodeJS.ProcessEnv = process.env) {
   const captures = await readSnapshotCaptures(env);
   return captures.find((capture) => capture.id === id);
+}
+
+export async function readSnapshotCaptureDetail(
+  id: string,
+  env: NodeJS.ProcessEnv = process.env
+): Promise<{ capture: SnapshotCaptureRecord; comparison?: SnapshotCaptureComparison } | undefined> {
+  const captures = await readSnapshotCaptures(env);
+  const capture = captures.find((candidate) => candidate.id === id);
+  if (!capture) return undefined;
+
+  const previous = captures
+    .filter((candidate) =>
+      candidate.id !== capture.id &&
+      candidate.summary.source === capture.summary.source &&
+      new Date(candidate.summary.observedAt).getTime() < new Date(capture.summary.observedAt).getTime()
+    )
+    .sort((a, b) => new Date(b.summary.observedAt).getTime() - new Date(a.summary.observedAt).getTime())[0];
+
+  return {
+    capture,
+    comparison: previous ? buildSnapshotCaptureComparison(capture, previous) : undefined
+  };
 }
 
 export async function clearSnapshotHistory(env: NodeJS.ProcessEnv = process.env) {
