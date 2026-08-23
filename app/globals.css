@@ -155,6 +155,28 @@ select {
   flex-wrap: wrap;
 }
 
+.search-field {
+  min-height: 38px;
+  width: min(280px, 42vw);
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+}
+
+.search-field input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
 .icon-button,
 .text-button {
   min-height: 38px;
@@ -394,6 +416,10 @@ select {
   padding: 16px 18px;
 }
 
+.profile-grid.wide {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .profile-card {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -452,7 +478,8 @@ select {
   }
 
   .metric-grid,
-  .profile-grid {
+  .profile-grid,
+  .profile-grid.wide {
     grid-template-columns: 1fr;
   }
 
