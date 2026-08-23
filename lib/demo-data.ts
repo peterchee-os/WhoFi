@@ -1,31 +1,16 @@
-import type { Alert, Device, EventContext, Profile } from "./types";
+import type { Alert, Device, Profile } from "./types";
 
 const now = Date.now();
 const minutesAgo = (minutes: number) => new Date(now - minutes * 60000).toISOString();
 const hoursAgo = (hours: number) => new Date(now - hours * 60 * 60000).toISOString();
 
-export const demoEvents: EventContext[] = [
-  {
-    id: "evt-gwa-build-night",
-    name: "GWA Build Night",
-    type: "hackathon",
-    location: "Thinkspace Seattle",
-    startsAt: hoursAgo(5),
-    endsAt: new Date(now + 7 * 60 * 60000).toISOString(),
-    attendeeCount: 82,
-    teamCount: 14
-  }
-];
-
 export const demoProfiles: Profile[] = [
   {
     id: "prof-lina",
     displayName: "Lina Park",
-    profileType: "event_attendee",
+    profileType: "guest",
     profileLevel: "verified",
     organizationName: "Northstar Labs",
-    eventName: "GWA Build Night",
-    teamName: "Team Beacon",
     email: "lina@example.test",
     lastSeen: minutesAgo(4)
   },
@@ -69,7 +54,7 @@ export const demoDevices: Device[] = [
     mac: "02:11:22:33:44:10",
     hostname: "lina-mbp",
     ip: "192.0.2.41",
-    ssid: "Thinkspace Event",
+    ssid: "Guest WiFi",
     apName: "Seattle Commons AP-03",
     location: "Thinkspace Seattle",
     status: "claimed",
@@ -103,7 +88,7 @@ export const demoDevices: Device[] = [
     mac: "02:11:22:33:44:30",
     hostname: "ubuntu",
     ip: "192.0.2.67",
-    ssid: "Thinkspace Event",
+    ssid: "Guest WiFi",
     apName: "Seattle Commons AP-04",
     location: "Thinkspace Seattle",
     status: "unknown",
@@ -177,7 +162,7 @@ export const demoAlerts: Alert[] = [
     severity: "warning",
     status: "open",
     label: "automation_like",
-    details: "High upload/download burst on event SSID. Label as automation-like until reviewed.",
+    details: "High upload/download burst on guest SSID. Label as automation-like until reviewed.",
     openedAt: minutesAgo(12)
   },
   {

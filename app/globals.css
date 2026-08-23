@@ -371,6 +371,22 @@ select {
   line-height: 1.4;
 }
 
+.compact-item {
+  padding-block: 12px;
+}
+
+.metric-pill {
+  min-width: 32px;
+  min-height: 26px;
+  border-radius: 999px;
+  background: var(--panel-strong);
+  color: var(--teal-dark);
+  display: inline-grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .profile-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -2,7 +2,6 @@ import {
   Activity,
   AlertTriangle,
   Bot,
-  Building2,
   Download,
   Gauge,
   RefreshCcw,
@@ -12,7 +11,7 @@ import {
   Wifi
 } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
-import { demoAlerts, demoDevices, demoEvents, demoProfiles } from "@/lib/demo-data";
+import { demoAlerts, demoDevices, demoProfiles } from "@/lib/demo-data";
 import { formatBytes, formatRelativeTime, percent } from "@/lib/format";
 
 const totalBytes = demoDevices.reduce((sum, device) => sum + device.rxBytes + device.txBytes, 0);
@@ -24,6 +23,12 @@ const openAlerts = demoAlerts.filter((alert) => alert.status === "open").length;
 const maxUsage = Math.max(...demoDevices.map((device) => device.rxBytes + device.txBytes));
 
 const profileById = new Map(demoProfiles.map((profile) => [profile.id, profile]));
+const ownerMix = [
+  { label: "Guests", value: demoProfiles.filter((profile) => ["guest", "drop_in"].includes(profile.profileType)).length },
+  { label: "Members", value: demoProfiles.filter((profile) => profile.profileType === "customer").length },
+  { label: "Staff", value: demoProfiles.filter((profile) => profile.profileType === "staff").length },
+  { label: "Agents", value: demoProfiles.filter((profile) => profile.profileType === "agent").length }
+];
 
 export default function Home() {
   return (
@@ -33,7 +38,7 @@ export default function Home() {
           <div className="brand-mark">W</div>
           <div>
             <h1>WhoFi</h1>
-            <p className="muted">Demo mode</p>
+            <p className="muted">Live demo</p>
           </div>
         </div>
 
@@ -57,8 +62,8 @@ export default function Home() {
         </nav>
 
         <div className="sidebar-section">
-          <p>GWA Build Night</p>
-          <p>82 attendees, 14 teams, 6 active demo devices, 3 review signals.</p>
+          <p>Current snapshot</p>
+          <p>6 devices, 5 profiles, 2 open review signals.</p>
         </div>
       </aside>
 
@@ -66,7 +71,7 @@ export default function Home() {
         <header className="topbar">
           <div>
             <h2>WiFi Identity Ledger</h2>
-            <p>Devices, owners, guests, members, agents, bandwidth, and review signals.</p>
+            <p>Devices, owners, bandwidth, and review signals.</p>
           </div>
           <div className="toolbar">
             <button className="icon-button" title="Search">
@@ -171,19 +176,18 @@ export default function Home() {
             <section className="panel">
               <div className="panel-header">
                 <div>
-                  <h3>Event Context</h3>
-                  <p>Optional context attached to device/profile evidence.</p>
+                  <h3>Owner Mix</h3>
+                  <p>Known profile types on the network.</p>
                 </div>
-                <Building2 size={20} color="var(--teal-dark)" />
+                <Users size={20} color="var(--teal-dark)" />
               </div>
               <div className="list">
-                {demoEvents.map((event) => (
-                  <div className="list-item" key={event.id}>
+                {ownerMix.map((item) => (
+                  <div className="list-item compact-item" key={item.label}>
                     <div className="list-title">
-                      <strong>{event.name}</strong>
-                      <span className="badge known_agent">{event.type}</span>
+                      <strong>{item.label}</strong>
+                      <span className="metric-pill">{item.value}</span>
                     </div>
-                    <p>{event.location} · {event.attendeeCount} attendees · {event.teamCount} teams</p>
                   </div>
                 ))}
               </div>
@@ -215,7 +219,7 @@ export default function Home() {
               <div className="panel-header">
                 <div>
                   <h3>Progressive Profiles</h3>
-                  <p>People, companies, guests, teams, and agents.</p>
+                  <p>Linked and claimed owners.</p>
                 </div>
                 <ShieldCheck size={20} color="var(--green)" />
               </div>

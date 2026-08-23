@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "WhoFi",
-  description: "WiFi identity and device visibility for coworking spaces, hackathons, events, and guest networks."
+  description: "WiFi identity and device visibility."
 };
 
 export default function RootLayout({
