@@ -66,6 +66,11 @@ Use Printing Press for Omada in this order:
 
 Do not publish a public Omada CLI until the auth/session approach is stable and does not expose private captured traffic, controller IDs, site IDs, MACs, IPs, cookies, tokens, or organization data.
 
+See also:
+
+- [Omada Printing Press Architecture](13-omada-printing-press-architecture.md)
+- [Omada Printing Press Implementation Plan](14-omada-printing-press-implementation-plan.md)
+
 ## Candidate CLI Commands
 
 ```text
@@ -105,4 +110,3 @@ The printed Omada CLI can become:
 - operator/debug tool
 - portable read-only sync runner
 - future worker-side implementation detail
-

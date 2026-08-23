@@ -53,6 +53,8 @@ Identity provider
 10. [Notifications](10-notifications.md)
 11. [Current Handoff](11-current-handoff.md)
 12. [Printing Press Omada Spike](12-printing-press-omada-spike.md)
+13. [Omada Printing Press Architecture](13-omada-printing-press-architecture.md)
+14. [Omada Printing Press Implementation Plan](14-omada-printing-press-implementation-plan.md)
 
 ## Implementation Artifacts
 
