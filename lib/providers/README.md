@@ -73,7 +73,7 @@ Returns WhoFi `Device` rows from a selected observation source:
 
 The dashboard source switcher uses this endpoint to keep demo mode as the default while allowing an operator to explicitly load configured Omada or Omada Printing Press live snapshots.
 
-Live network sources are disabled unless `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true`. Demo mode remains available without that flag.
+Live network sources are disabled unless `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true`. Demo mode remains available without that flag. The dashboard source switcher reads provider status and disables live source buttons while the gate is off.
 
 If `WHOFI_LIVE_DEVICE_SOURCE_TOKEN` is set, live source requests must include the same value in `X-WhoFi-Live-Source-Token`. The dashboard has a local password field for this token and sends it only when loading live sources.
 

@@ -103,6 +103,12 @@ type NetworkProviderConfigStatus = {
   required: string[];
 };
 
+type LiveSourceAccess = {
+  enabled: boolean;
+  loaded: boolean;
+  tokenRequired: boolean;
+};
+
 type ReviewState = {
   activity: ActivityEntry[];
   alertStatusOverrides: Record<string, AlertStatus>;
@@ -248,6 +254,11 @@ export default function Home() {
   const [selectedDeviceId, setSelectedDeviceId] = useState("dev-unknown-burst");
   const [deviceSnapshotSource, setDeviceSnapshotSource] = useState<DeviceSnapshotSource>("demo");
   const [liveSourceToken, setLiveSourceToken] = useState("");
+  const [liveSourceAccess, setLiveSourceAccess] = useState<LiveSourceAccess>({
+    enabled: false,
+    loaded: false,
+    tokenRequired: false
+  });
   const [sourceDevices, setSourceDevices] = useState<Device[]>(demoDevices);
   const [sourceState, setSourceState] = useState<IntegrationTestState>({
     message: "Demo",
@@ -321,6 +332,35 @@ export default function Home() {
     return () => window.clearTimeout(timeout);
   }, [notice]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/providers/network/status")
+      .then((response) => response.json())
+      .then((payload) => {
+        if (cancelled) return;
+        const providers = Array.isArray(payload.providers) ? payload.providers as NetworkProviderConfigStatus[] : [];
+        const liveProviders = providers.filter((provider) => provider.providerId === "omada" || provider.providerId === "omada-printing-press");
+        setLiveSourceAccess({
+          enabled: liveProviders.some((provider) => provider.liveSnapshotsEnabled),
+          loaded: true,
+          tokenRequired: liveProviders.some((provider) => provider.liveSourceTokenRequired)
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLiveSourceAccess({
+          enabled: false,
+          loaded: true,
+          tokenRequired: false
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const devices = useMemo(() => {
     return sourceDevices.map((device) => ({
       ...device,
@@ -387,6 +427,16 @@ export default function Home() {
       });
       setNotice("Demo snapshot loaded");
       addActivity(setActivity, "Loaded demo device snapshot");
+      return;
+    }
+
+    if (!liveSourceAccess.enabled) {
+      setSourceState({
+        message: liveSourceAccess.loaded ? "Live off" : "Checking",
+        status: liveSourceAccess.loaded ? "error" : "testing",
+        testedAt: new Date().toISOString()
+      });
+      setNotice(liveSourceAccess.loaded ? "Live disabled" : "Checking access");
       return;
     }
 
@@ -564,9 +614,10 @@ export default function Home() {
               {deviceSourceOptions.map((source) => (
                 <button
                   className={deviceSnapshotSource === source.id ? "active" : ""}
+                  disabled={source.id !== "demo" && !liveSourceAccess.enabled}
                   key={source.id}
                   onClick={() => loadDeviceSource(source.id)}
-                  title={`Load ${source.label} devices`}
+                  title={getDeviceSourceTitle(source.id, liveSourceAccess)}
                 >
                   {source.label}
                 </button>
@@ -578,8 +629,9 @@ export default function Home() {
               <input
                 aria-label="Live source token"
                 autoComplete="off"
+                disabled={!liveSourceAccess.enabled}
                 onChange={(event) => setLiveSourceToken(event.target.value)}
-                placeholder="Live token"
+                placeholder={liveSourceAccess.tokenRequired ? "Live token" : "Token optional"}
                 type="password"
                 value={liveSourceToken}
               />
@@ -1911,6 +1963,13 @@ function formatDeviceSourceLabel(source: DeviceSnapshotSource) {
   if (source === "omada") return "Omada";
   if (source === "omada-pp") return "Omada CLI";
   return "Demo";
+}
+
+function getDeviceSourceTitle(source: DeviceSnapshotSource, liveSourceAccess: LiveSourceAccess) {
+  if (source === "demo") return "Load Demo devices";
+  if (!liveSourceAccess.loaded) return "Checking live source access";
+  if (!liveSourceAccess.enabled) return "Live snapshots disabled";
+  return `Load ${formatDeviceSourceLabel(source)} devices`;
 }
 
 function formatSourceStateMessage(count: number, verification?: DeviceSnapshotVerification) {
