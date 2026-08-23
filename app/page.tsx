@@ -110,6 +110,19 @@ type LiveSourceAccess = {
   tokenRequired: boolean;
 };
 
+type SnapshotHistoryEntry = {
+  id: string;
+  observedAt: string;
+  onlineDevices: number;
+  reviewSignals: number;
+  source: DeviceSnapshotSource;
+  topAp?: string;
+  topLocation?: string;
+  topSsid?: string;
+  totalBytes: number;
+  unknownDevices: number;
+};
+
 type ReviewState = {
   activity: ActivityEntry[];
   alertStatusOverrides: Record<string, AlertStatus>;
@@ -117,6 +130,7 @@ type ReviewState = {
   notificationSettings: NotificationSettings;
   profileOverrides: Record<string, string | undefined>;
   riskOverrides: Record<string, RiskState>;
+  snapshotHistory?: SnapshotHistoryEntry[];
   statusOverrides: Record<string, DeviceStatus>;
 };
 
@@ -277,6 +291,7 @@ export default function Home() {
   const [statusOverrides, setStatusOverrides] = useState<Record<string, DeviceStatus>>({});
   const [riskOverrides, setRiskOverrides] = useState<Record<string, RiskState>>({});
   const [alertStatusOverrides, setAlertStatusOverrides] = useState<Record<string, AlertStatus>>({});
+  const [snapshotHistory, setSnapshotHistory] = useState<SnapshotHistoryEntry[]>([]);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [notice, setNotice] = useState("Ready");
@@ -292,18 +307,21 @@ export default function Home() {
         setNotificationSettings(mergeNotificationSettings(parsed.notificationSettings));
         setProfileOverrides(parsed.profileOverrides ?? {});
         setRiskOverrides(parsed.riskOverrides ?? {});
+        setSnapshotHistory(parsed.snapshotHistory ?? []);
         setStatusOverrides(parsed.statusOverrides ?? {});
       } catch {
         window.localStorage.removeItem(reviewStateKey);
       }
     } else {
+      const observedAt = new Date().toISOString();
       setActivity([
         {
           id: "initial",
           message: "Demo snapshot loaded",
-          timestamp: new Date().toISOString()
+          timestamp: observedAt
         }
       ]);
+      setSnapshotHistory([createSnapshotHistoryEntry("demo", demoDevices, observedAt)]);
     }
     setStateLoaded(true);
   }, []);
@@ -318,6 +336,7 @@ export default function Home() {
       notificationSettings,
       profileOverrides,
       riskOverrides,
+      snapshotHistory,
       statusOverrides
     };
     window.localStorage.setItem(reviewStateKey, JSON.stringify(nextState));
@@ -328,6 +347,7 @@ export default function Home() {
     notificationSettings,
     profileOverrides,
     riskOverrides,
+    snapshotHistory,
     stateLoaded,
     statusOverrides
   ]);
@@ -426,6 +446,11 @@ export default function Home() {
   const title = viewTitles[activeView];
   const selectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? devices[0];
 
+  const recordSnapshotHistory = (source: DeviceSnapshotSource, snapshotDevices: Device[], observedAt: string) => {
+    const entry = createSnapshotHistoryEntry(source, snapshotDevices, observedAt);
+    setSnapshotHistory((current) => [entry, ...current].slice(0, 10));
+  };
+
   const loadDeviceSource = async (source: DeviceSnapshotSource) => {
     setSourceState({
       message: "Loading",
@@ -436,11 +461,13 @@ export default function Home() {
       setDeviceSnapshotSource("demo");
       setSourceDevices(demoDevices);
       setSelectedDeviceId("dev-unknown-burst");
-      setSnapshotObservedAt(new Date().toISOString());
+      const observedAt = new Date().toISOString();
+      setSnapshotObservedAt(observedAt);
+      recordSnapshotHistory("demo", demoDevices, observedAt);
       setSourceState({
         message: "Demo",
         status: "success",
-        testedAt: new Date().toISOString()
+        testedAt: observedAt
       });
       setNotice("Demo snapshot loaded");
       addActivity(setActivity, "Loaded demo device snapshot");
@@ -473,11 +500,13 @@ export default function Home() {
       setDeviceSnapshotSource(source);
       setSourceDevices(payload.devices);
       setSelectedDeviceId(payload.devices[0]?.id ?? "");
-      setSnapshotObservedAt(new Date().toISOString());
+      const observedAt = new Date().toISOString();
+      setSnapshotObservedAt(observedAt);
+      recordSnapshotHistory(source, payload.devices, observedAt);
       setSourceState({
         message: formatSourceStateMessage(payload.devices.length, payload.verificationClient),
         status: "success",
-        testedAt: new Date().toISOString()
+        testedAt: observedAt
       });
       setNotice("Snapshot loaded");
       addActivity(setActivity, `Loaded ${formatDeviceSourceLabel(source)} device snapshot (${payload.devices.length} devices)`);
@@ -538,7 +567,9 @@ export default function Home() {
     setStatusOverrides({});
     setDeviceSnapshotSource("demo");
     setSourceDevices(demoDevices);
-    setSnapshotObservedAt(new Date().toISOString());
+    const observedAt = new Date().toISOString();
+    setSnapshotObservedAt(observedAt);
+    recordSnapshotHistory("demo", demoDevices, observedAt);
     setSourceState({
       message: "Demo",
       status: "success"
@@ -557,6 +588,7 @@ export default function Home() {
       exportedAt: new Date().toISOString(),
       notificationSettings,
       emailDeliveries,
+      snapshotHistory,
       profiles: demoProfiles,
       reviewState: {
         activity,
@@ -565,6 +597,7 @@ export default function Home() {
         notificationSettings,
         profileOverrides,
         riskOverrides,
+        snapshotHistory,
         statusOverrides
       }
     };
@@ -695,7 +728,9 @@ export default function Home() {
             selectedDeviceId={selectedDeviceId}
           />
         ) : null}
-        {activeView === "usage" ? <UsageView sessionSnapshot={sessionSnapshot} /> : null}
+        {activeView === "usage" ? (
+          <UsageView sessionSnapshot={sessionSnapshot} snapshotHistory={snapshotHistory} />
+        ) : null}
         {activeView === "profiles" ? <ProfilesView profiles={demoProfiles} /> : null}
         {activeView === "alerts" ? <AlertsView alerts={alerts} onSetAlertStatus={setAlertStatus} /> : null}
         {activeView === "settings" ? (
@@ -859,37 +894,47 @@ function DevicesView({
   );
 }
 
-function UsageView({ sessionSnapshot }: { sessionSnapshot: SessionSnapshot }) {
+function UsageView({
+  sessionSnapshot,
+  snapshotHistory
+}: {
+  sessionSnapshot: SessionSnapshot;
+  snapshotHistory: SnapshotHistoryEntry[];
+}) {
   const maxRollupBytes = Math.max(0, ...sessionSnapshot.rollups.map((rollup) => rollup.totalBytes));
 
   return (
     <section className="content-grid usage-layout">
-      <div className="panel">
-        <div className="panel-header">
-          <div>
-            <h3>Session Totals</h3>
-            <p>{formatDeviceSourceLabel(sessionSnapshot.source)} snapshot · <RelativeTime value={sessionSnapshot.observedAt} /></p>
+      <div className="side-stack">
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h3>Session Totals</h3>
+              <p>{formatDeviceSourceLabel(sessionSnapshot.source)} snapshot · <RelativeTime value={sessionSnapshot.observedAt} /></p>
+            </div>
+            <Activity size={20} color="var(--teal-dark)" />
           </div>
-          <Activity size={20} color="var(--teal-dark)" />
+          <div className="usage-summary">
+            <div>
+              <span>Total usage</span>
+              <strong>{formatBytes(sessionSnapshot.totals.totalBytes)}</strong>
+            </div>
+            <div>
+              <span>Download</span>
+              <strong>{formatBytes(sessionSnapshot.totals.totalRxBytes)}</strong>
+            </div>
+            <div>
+              <span>Upload</span>
+              <strong>{formatBytes(sessionSnapshot.totals.totalTxBytes)}</strong>
+            </div>
+            <div>
+              <span>Unknown</span>
+              <strong>{sessionSnapshot.totals.unknownDevices}</strong>
+            </div>
+          </div>
         </div>
-        <div className="usage-summary">
-          <div>
-            <span>Total usage</span>
-            <strong>{formatBytes(sessionSnapshot.totals.totalBytes)}</strong>
-          </div>
-          <div>
-            <span>Download</span>
-            <strong>{formatBytes(sessionSnapshot.totals.totalRxBytes)}</strong>
-          </div>
-          <div>
-            <span>Upload</span>
-            <strong>{formatBytes(sessionSnapshot.totals.totalTxBytes)}</strong>
-          </div>
-          <div>
-            <span>Unknown</span>
-            <strong>{sessionSnapshot.totals.unknownDevices}</strong>
-          </div>
-        </div>
+
+        <SnapshotHistoryPanel entries={snapshotHistory} />
       </div>
 
       <div className="usage-rollup-grid">
@@ -952,6 +997,43 @@ function UsageRollupPanel({
             </p>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function SnapshotHistoryPanel({ entries }: { entries: SnapshotHistoryEntry[] }) {
+  const visibleEntries = entries.slice(0, 8);
+
+  return (
+    <div className="panel">
+      <div className="panel-header">
+        <div>
+          <h3>Snapshot History</h3>
+          <p>{visibleEntries.length} recent captures.</p>
+        </div>
+      </div>
+      <div className="list">
+        {visibleEntries.map((entry, index) => {
+          const previous = entries[index + 1];
+          const delta = previous ? entry.totalBytes - previous.totalBytes : 0;
+
+          return (
+            <div className="list-item compact-item snapshot-history-row" key={entry.id}>
+              <div className="list-title">
+                <strong>{formatDeviceSourceLabel(entry.source)}</strong>
+                <span className={`metric-pill ${delta > 0 ? "up" : delta < 0 ? "down" : ""}`}>
+                  {formatHistoryDelta(delta)}
+                </span>
+              </div>
+              <p>
+                {formatBytes(entry.totalBytes)} · {entry.onlineDevices} devices · {entry.unknownDevices} unknown
+              </p>
+              <p className="truncate">Top: {formatHistoryTop(entry)}</p>
+              <p><RelativeTime value={entry.observedAt} /></p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -2088,6 +2170,46 @@ function getDeviceSourceTitle(source: DeviceSnapshotSource, liveSourceAccess: Li
   if (!liveSourceAccess.loaded) return "Checking live source access";
   if (!liveSourceAccess.enabled) return "Live snapshots disabled";
   return `Load ${formatDeviceSourceLabel(source)} devices`;
+}
+
+function createSnapshotHistoryEntry(
+  source: DeviceSnapshotSource,
+  devices: Device[],
+  observedAt: string
+): SnapshotHistoryEntry {
+  const sessionSnapshot = buildSessionSnapshot({
+    count: devices.length,
+    devices,
+    observedAt,
+    source
+  });
+
+  return {
+    id: crypto.randomUUID(),
+    observedAt,
+    onlineDevices: sessionSnapshot.totals.onlineDevices,
+    reviewSignals: sessionSnapshot.totals.reviewSignals,
+    source,
+    topAp: getTopRollupLabel(sessionSnapshot.rollups, "ap"),
+    topLocation: getTopRollupLabel(sessionSnapshot.rollups, "location"),
+    topSsid: getTopRollupLabel(sessionSnapshot.rollups, "ssid"),
+    totalBytes: sessionSnapshot.totals.totalBytes,
+    unknownDevices: sessionSnapshot.totals.unknownDevices
+  };
+}
+
+function getTopRollupLabel(rollups: UsageRollup[], dimension: UsageRollupDimension) {
+  return rollups.find((rollup) => rollup.dimension === dimension)?.label;
+}
+
+function formatHistoryDelta(delta: number) {
+  if (delta > 0) return `+${formatBytes(delta)}`;
+  if (delta < 0) return `-${formatBytes(Math.abs(delta))}`;
+  return "Base";
+}
+
+function formatHistoryTop(entry: SnapshotHistoryEntry) {
+  return [entry.topLocation, entry.topSsid, entry.topAp].filter(Boolean).join(" / ") || "none";
 }
 
 function formatSourceStateMessage(count: number, verification?: DeviceSnapshotVerification) {

@@ -598,6 +598,20 @@ textarea {
   font-weight: 800;
 }
 
+.metric-pill.up {
+  background: #e7f5ec;
+  color: var(--green);
+}
+
+.metric-pill.down {
+  background: #fee2e2;
+  color: var(--red);
+}
+
+.snapshot-history-row p:last-child {
+  font-size: 12px;
+}
+
 .detail-body {
   padding: 16px 18px 18px;
   display: grid;

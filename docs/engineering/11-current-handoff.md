@@ -14,7 +14,7 @@ Latest completed slices:
 - search across device, owner, profile, and network fields
 - device inspection panel
 - dashboard source switcher for Demo, Omada, and optional Omada Printing Press CLI snapshots
-- Usage view with current snapshot totals and rollups by location, SSID, and AP
+- Usage view with current snapshot totals, recent browser-local history, and rollups by location, SSID, and AP
 - local review actions: assign, reviewed, watch, block
 - local alert actions: acknowledge, resolve
 - localStorage persistence for demo review state
@@ -111,7 +111,7 @@ Do not start with:
 Next practical order:
 
 1. Add app-level admin authentication.
-2. Persist device snapshots and session rollups instead of deriving them only in memory.
+2. Persist device snapshots, snapshot history, and session rollups server-side instead of deriving/storing them only in memory or browser localStorage.
 3. Demo data cleanup and responsive pass.
 4. Lightweight in-memory/server-side provider interface for notifications.
 5. Settings/Notifications UI polish if needed.
