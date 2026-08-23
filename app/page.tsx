@@ -559,6 +559,43 @@ export default function Home() {
     }
   };
 
+  const deleteSelectedSnapshotCapture = async () => {
+    if (!selectedSnapshotCaptureId) return;
+
+    try {
+      const response = await fetch(`/api/snapshot-history/${encodeURIComponent(selectedSnapshotCaptureId)}`, {
+        method: "DELETE"
+      });
+      const payload = (await response.json()) as {
+        entries?: SnapshotHistoryEntry[];
+        error?: string;
+      };
+      if (!response.ok || !Array.isArray(payload.entries)) {
+        throw new Error(payload.error ?? "Capture delete failed");
+      }
+
+      setPersistedSnapshotCaptureIds(payload.entries.map((entry) => entry.id));
+      setSnapshotHistory((current) => mergeSnapshotHistory(payload.entries ?? [], current.filter((entry) => entry.id !== selectedSnapshotCaptureId)).slice(0, 10));
+      setSelectedSnapshotComparison(undefined);
+      setSelectedSnapshotCapture(undefined);
+      setSelectedSnapshotCaptureId("");
+      setSnapshotCaptureState({
+        message: "No capture selected",
+        status: "idle"
+      });
+      setNotice("Capture deleted");
+      addActivity(setActivity, "Deleted stored snapshot capture");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Capture delete failed";
+      setSnapshotCaptureState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Capture delete failed");
+    }
+  };
+
   const loadSnapshotCapture = async (entryId: string) => {
     setSelectedSnapshotCaptureId(entryId);
     setSnapshotCaptureState({
@@ -910,6 +947,7 @@ export default function Home() {
         {activeView === "usage" ? (
           <UsageView
             onClearSnapshotHistory={clearSnapshotHistory}
+            onDeleteSelectedSnapshotCapture={deleteSelectedSnapshotCapture}
             onLoadSnapshotCapture={loadSnapshotCapture}
             persistedSnapshotCaptureIds={persistedSnapshotCaptureIds}
             selectedSnapshotComparison={selectedSnapshotComparison}
@@ -1185,6 +1223,7 @@ function DevicesView({
 
 function UsageView({
   onClearSnapshotHistory,
+  onDeleteSelectedSnapshotCapture,
   onLoadSnapshotCapture,
   persistedSnapshotCaptureIds,
   selectedSnapshotComparison,
@@ -1195,6 +1234,7 @@ function UsageView({
   snapshotHistory
 }: {
   onClearSnapshotHistory: () => void;
+  onDeleteSelectedSnapshotCapture: () => void;
   onLoadSnapshotCapture: (entryId: string) => void;
   persistedSnapshotCaptureIds: string[];
   selectedSnapshotComparison?: SnapshotCaptureComparison;
@@ -1263,6 +1303,7 @@ function UsageView({
         <SnapshotCapturePanel
           capture={selectedSnapshotCapture}
           comparison={selectedSnapshotComparison}
+          onDelete={onDeleteSelectedSnapshotCapture}
           state={snapshotCaptureState}
         />
         <UsageRollupPanel
@@ -1332,10 +1373,12 @@ function UsageRollupPanel({
 function SnapshotCapturePanel({
   capture,
   comparison,
+  onDelete,
   state
 }: {
   capture?: SnapshotCaptureRecord;
   comparison?: SnapshotCaptureComparison;
+  onDelete: () => void;
   state: IntegrationTestState;
 }) {
   const topDevices = capture
@@ -1356,7 +1399,12 @@ function SnapshotCapturePanel({
             {capture ? <RelativeTime value={capture.summary.observedAt} /> : null}
           </p>
         </div>
-        <span className={`integration-state ${state.status}`}>{state.message}</span>
+        <div className="panel-actions">
+          <button className="text-button slim" disabled={!capture} onClick={onDelete} type="button">
+            Delete
+          </button>
+          <span className={`integration-state ${state.status}`}>{state.message}</span>
+        </div>
       </div>
       {capture ? (
         <>

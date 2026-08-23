@@ -432,6 +432,14 @@ textarea {
   font-size: 13px;
 }
 
+.panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .device-table {
   width: 100%;
   border-collapse: collapse;

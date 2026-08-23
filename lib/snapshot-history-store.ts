@@ -78,6 +78,29 @@ export async function clearSnapshotHistory(env: NodeJS.ProcessEnv = process.env)
   await writeSnapshotHistoryFile({ captures: [], entries: [] }, env);
 }
 
+export async function deleteSnapshotCapture(
+  id: string,
+  env: NodeJS.ProcessEnv = process.env
+): Promise<{ deleted: boolean; entries: SnapshotHistoryEntry[] }> {
+  const current = await readSnapshotHistoryFile(env);
+  const captures = current.captures.filter((capture) => capture.id !== id);
+  const entries = current.entries.filter((entry) => entry.id !== id);
+  const deleted = captures.length !== current.captures.length || entries.length !== current.entries.length;
+
+  if (!deleted) {
+    return {
+      deleted,
+      entries: current.entries
+    };
+  }
+
+  await writeSnapshotHistoryFile({ captures, entries }, env);
+  return {
+    deleted,
+    entries
+  };
+}
+
 async function readSnapshotHistoryFile(env: NodeJS.ProcessEnv): Promise<SnapshotHistoryFile> {
   try {
     const raw = await readFile(/* turbopackIgnore: true */ getSnapshotHistoryPath(env), "utf8");
