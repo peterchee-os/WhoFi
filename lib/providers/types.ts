@@ -11,6 +11,7 @@ export type NetworkObservation = {
   providerType: NetworkProviderType;
   observedAt: string;
   eventType: "client_seen" | "client_disconnected" | "usage_sample";
+  apMac?: string;
   mac: string;
   hostname?: string;
   ip?: string;

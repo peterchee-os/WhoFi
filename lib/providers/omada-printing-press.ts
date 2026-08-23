@@ -162,6 +162,7 @@ function normalizeCliObservation(row: unknown, index: number): NetworkObservatio
   }
 
   return {
+    apMac: readOptionalString(row.apMac),
     apName: readOptionalString(row.apName),
     eventType: row.eventType === "client_disconnected" || row.eventType === "usage_sample" ? row.eventType : "client_seen",
     hostname: readOptionalString(row.hostname),

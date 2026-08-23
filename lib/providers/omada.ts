@@ -62,6 +62,7 @@ export function normalizeOmadaClientSnapshot(
   if (!mac) return null;
 
   return {
+    apMac: snapshot.apMac,
     apName: snapshot.apName ?? snapshot.ap ?? snapshot.apMac,
     eventType: snapshot.status === "DISCONNECTED" ? "client_disconnected" : "client_seen",
     hostname: snapshot.hostName ?? snapshot.name ?? snapshot.clientName,

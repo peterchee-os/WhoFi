@@ -14,11 +14,15 @@ export type DeviceSnapshot = {
 
 export type DeviceSnapshotVerification = {
   configured: boolean;
+  kind: DeviceSnapshotVerificationKind;
   label?: string;
   present: boolean;
 };
 
+export type DeviceSnapshotVerificationKind = "access_point" | "client";
+
 export type DeviceSnapshotOptions = {
+  verificationAnchorKind?: string;
   verificationClientMac?: string;
   verificationClientLabel?: string;
 };
@@ -46,7 +50,7 @@ export function buildDeviceSnapshotFromObservations(
     devices,
     observedAt,
     source,
-    verificationClient: verifyClientPresence(devices, options)
+    verificationClient: verifyAnchorPresence(devices, options, observations)
   };
 }
 
@@ -91,14 +95,31 @@ function inferBurstScore(observation: NetworkObservation) {
 }
 
 function verifyClientPresence(devices: Device[], options: DeviceSnapshotOptions): DeviceSnapshotVerification | undefined {
+  return verifyAnchorPresence(devices, options);
+}
+
+function verifyAnchorPresence(
+  devices: Device[],
+  options: DeviceSnapshotOptions,
+  observations: NetworkObservation[] = []
+): DeviceSnapshotVerification | undefined {
   const normalizedMac = normalizeMac(options.verificationClientMac);
   if (!normalizedMac) return undefined;
+  const kind = readVerificationKind(options.verificationAnchorKind);
+  const present = kind === "access_point"
+    ? observations.some((observation) => normalizeMac(observation.apMac) === normalizedMac)
+    : devices.some((device) => normalizeMac(device.mac) === normalizedMac);
 
   return {
     configured: true,
+    kind,
     label: options.verificationClientLabel?.trim() || undefined,
-    present: devices.some((device) => normalizeMac(device.mac) === normalizedMac)
+    present
   };
+}
+
+function readVerificationKind(value?: string): DeviceSnapshotVerificationKind {
+  return value === "access_point" ? "access_point" : "client";
 }
 
 function normalizeMac(value?: string) {

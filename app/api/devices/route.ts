@@ -15,6 +15,7 @@ export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
   const source = readSource(request);
   const verificationOptions = {
+    verificationAnchorKind: process.env.WHOFI_VERIFICATION_ANCHOR_KIND,
     verificationClientLabel: process.env.WHOFI_VERIFICATION_CLIENT_LABEL,
     verificationClientMac: process.env.WHOFI_VERIFICATION_CLIENT_MAC
   };

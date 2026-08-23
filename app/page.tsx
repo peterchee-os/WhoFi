@@ -42,6 +42,7 @@ type NotificationRuleKey =
 
 type DeviceSnapshotVerification = {
   configured: boolean;
+  kind: "access_point" | "client";
   label?: string;
   present: boolean;
 };
@@ -1893,7 +1894,8 @@ function formatDeviceSourceLabel(source: DeviceSnapshotSource) {
 
 function formatSourceStateMessage(count: number, verification?: DeviceSnapshotVerification) {
   if (!verification?.configured) return `${count} devices`;
-  return `${count} devices / anchor ${verification.present ? "present" : "missing"}`;
+  const anchorLabel = verification.kind === "access_point" ? "AP anchor" : "client anchor";
+  return `${count} devices / ${anchorLabel} ${verification.present ? "present" : "missing"}`;
 }
 
 function getDeviceLabel(deviceId: string, devices: Device[] = demoDevices) {
