@@ -14,7 +14,7 @@ Latest completed slices:
 - search across device, owner, profile, and network fields
 - device inspection panel
 - dashboard source switcher for Demo, Omada, and optional Omada Printing Press CLI snapshots
-- Usage view with current snapshot totals, recent history, stored capture detail, previous-capture deltas, and rollups by location, SSID, and AP
+- Usage view with current snapshot totals, recent history, stored capture detail, previous-capture deltas, new/missing device movement, and rollups by location, SSID, and AP
 - local file-backed snapshot audit history at `.whofi/snapshot-history.json`, with bounded full captures and `WHOFI_SNAPSHOT_HISTORY_PATH` override
 - local review actions: assign, reviewed, watch, block
 - local alert actions: acknowledge, resolve

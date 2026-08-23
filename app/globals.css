@@ -633,6 +633,61 @@ textarea {
   margin: -4px 18px 14px;
 }
 
+.device-change-grid {
+  padding: 0 18px 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.device-change-list {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.device-change-header,
+.device-change-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.device-change-header {
+  min-height: 38px;
+  padding: 6px 10px;
+  background: var(--panel-strong);
+}
+
+.device-change-row {
+  padding: 9px 10px;
+  border-top: 1px solid #edf0ed;
+}
+
+.device-change-row div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.device-change-row strong {
+  font-size: 13px;
+}
+
+.device-change-row span,
+.device-change-list p {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.device-change-list p {
+  margin: 0;
+  padding: 10px;
+}
+
 .usage-rollup-grid {
   display: grid;
   gap: 18px;

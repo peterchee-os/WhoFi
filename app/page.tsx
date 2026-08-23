@@ -1389,6 +1389,7 @@ function SnapshotCapturePanel({
           ) : (
             <p className="comparison-caption">No earlier stored capture for this source.</p>
           )}
+          {comparison ? <DeviceChangeSummary comparison={comparison} /> : null}
           <div className="list">
             {topDevices.map((device) => (
               <div className="list-item compact-item" key={device.id}>
@@ -1467,6 +1468,45 @@ function SnapshotHistoryPanel({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function DeviceChangeSummary({ comparison }: { comparison: SnapshotCaptureComparison }) {
+  return (
+    <div className="device-change-grid">
+      <DeviceChangeList label="New" rows={comparison.newDevices} />
+      <DeviceChangeList label="Missing" rows={comparison.missingDevices} />
+    </div>
+  );
+}
+
+function DeviceChangeList({
+  label,
+  rows
+}: {
+  label: "Missing" | "New";
+  rows: SnapshotCaptureComparison["newDevices"];
+}) {
+  return (
+    <div className="device-change-list">
+      <div className="device-change-header">
+        <strong>{label}</strong>
+        <span className="metric-pill">{rows.length}</span>
+      </div>
+      {rows.length ? (
+        rows.map((device) => (
+          <div className="device-change-row" key={device.id}>
+            <div>
+              <strong className="truncate">{device.hostname}</strong>
+              <span className="truncate">{device.ssid} · {device.apName} · {device.status}</span>
+            </div>
+            <span>{formatBytes(device.totalBytes)}</span>
+          </div>
+        ))
+      ) : (
+        <p>No devices.</p>
+      )}
     </div>
   );
 }

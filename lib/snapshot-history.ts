@@ -33,9 +33,20 @@ export type SnapshotCaptureComparison = {
     totalTxBytes: number;
     unknownDevices: number;
   };
+  missingDevices: SnapshotDeviceChange[];
+  newDevices: SnapshotDeviceChange[];
   previousCapturedAt: string;
   previousId: string;
   previousObservedAt: string;
+};
+
+export type SnapshotDeviceChange = {
+  apName: string;
+  hostname: string;
+  id: string;
+  ssid: string;
+  status: string;
+  totalBytes: number;
 };
 
 export function buildSnapshotCaptureComparison(
@@ -51,9 +62,40 @@ export function buildSnapshotCaptureComparison(
       totalTxBytes: current.sessionSnapshot.totals.totalTxBytes - previous.sessionSnapshot.totals.totalTxBytes,
       unknownDevices: current.summary.unknownDevices - previous.summary.unknownDevices
     },
+    missingDevices: getMissingDevices(current, previous),
+    newDevices: getNewDevices(current, previous),
     previousCapturedAt: previous.capturedAt,
     previousId: previous.id,
     previousObservedAt: previous.summary.observedAt
+  };
+}
+
+function getNewDevices(current: SnapshotCaptureRecord, previous: SnapshotCaptureRecord) {
+  const previousDeviceIds = new Set(previous.deviceSnapshot.devices.map((device) => device.id));
+  return current.deviceSnapshot.devices
+    .filter((device) => !previousDeviceIds.has(device.id))
+    .map(toDeviceChange)
+    .sort((a, b) => b.totalBytes - a.totalBytes)
+    .slice(0, 6);
+}
+
+function getMissingDevices(current: SnapshotCaptureRecord, previous: SnapshotCaptureRecord) {
+  const currentDeviceIds = new Set(current.deviceSnapshot.devices.map((device) => device.id));
+  return previous.deviceSnapshot.devices
+    .filter((device) => !currentDeviceIds.has(device.id))
+    .map(toDeviceChange)
+    .sort((a, b) => b.totalBytes - a.totalBytes)
+    .slice(0, 6);
+}
+
+function toDeviceChange(device: Device): SnapshotDeviceChange {
+  return {
+    apName: device.apName,
+    hostname: device.hostname,
+    id: device.id,
+    ssid: device.ssid,
+    status: device.status,
+    totalBytes: device.rxBytes + device.txBytes
   };
 }
 
