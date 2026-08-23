@@ -196,8 +196,10 @@ Current implementation state:
 
 - exact normalizer module exists at `lib/providers/meraki.ts`
 - demo-safe shape endpoint exists at `/api/observations/meraki/shape`
+- server-side live test endpoint exists at `/api/observations/meraki/test`
 - Settings integration card can test the normalized output shape
-- no live Meraki API client, credentials, or production sync yet
+- live Meraki API client scaffolding exists for read-only client observations
+- no production sync scheduler yet
 
 ## Yardi Kube Connector
 

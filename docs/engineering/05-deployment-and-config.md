@@ -97,6 +97,7 @@ network_providers:
       organization_id: "${MERAKI_ORGANIZATION_ID}"
       network_id: "${MERAKI_NETWORK_ID}"
       api_key: "${MERAKI_API_KEY}"
+      base_url: "${MERAKI_API_BASE_URL}"
 
 identity_providers:
   - id: "yardi"

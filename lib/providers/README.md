@@ -32,3 +32,11 @@ GET /api/observations/meraki/shape
 ```
 
 Returns one fake Cisco Meraki client payload normalized into a WhoFi observation.
+
+## Live Test Endpoints
+
+```text
+GET /api/observations/meraki/test
+```
+
+Uses server-side `MERAKI_API_KEY` and `MERAKI_NETWORK_ID` to fetch recent clients from the Meraki Dashboard API. Returns `409` when required env vars are missing. Never expose the API key in responses or logs.
