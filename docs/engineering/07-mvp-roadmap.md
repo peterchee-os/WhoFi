@@ -95,6 +95,7 @@ Deliverables:
 - identity provider interface
 - Yardi Kube connector
 - CSV/manual import
+- CSV/manual import shape endpoint and parser
 - normalized companies/people/contracts
 - profile link suggestions
 

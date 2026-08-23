@@ -47,6 +47,14 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
   },
   {
     category: "Identity",
+    description: "Roster, guest list, and manual import source",
+    id: "identity-csv",
+    name: "CSV / Manual Import",
+    status: "shape_ready",
+    testPath: "/api/profiles/csv/shape"
+  },
+  {
+    category: "Identity",
     description: "Property/customer entitlement source",
     id: "identity-yardi",
     name: "Yardi",

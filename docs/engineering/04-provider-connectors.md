@@ -351,6 +351,14 @@ Responsibilities:
 
 This is important because many coworking operators and hackathon organizers will not have a clean API on day one.
 
+Current implementation state:
+
+- exact normalizer module exists at `lib/integrations/identity/csv`
+- demo-safe shape endpoint exists at `/api/profiles/csv/shape`
+- Settings integration card can test normalized output from a fake CSV roster
+- parser supports comma-delimited and tab-delimited input with quoted fields
+- no production upload UI or persisted import job yet
+
 ## Demo Provider
 
 Required for GWA and local quickstart.
