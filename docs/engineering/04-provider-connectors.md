@@ -196,6 +196,8 @@ Current browser recon notes:
 - The console uses a controller/org path segment before `/api/v2`.
 - Browser resource traces confirmed API paths such as `/api/v2/sites/{siteId}/site/workspace`, `/api/v2/sites/{siteId}/dashboard/activeSsids`, and OpenAPI dashboard routes such as `/openapi/v1/{controllerId}/sites/{siteId}/dashboard/active-clients`.
 - Earlier bundle recon suggested a current clients path under `/{controllerId}/api/v2/sites/{siteId}/insight/clients`; keep this as a candidate until the live read-only connector confirms the exact best endpoint.
+- Live shell probe with the 1Password credentials confirmed `/{controllerId}/api/v2/login` succeeds and returns an Omada token.
+- Calling `/{controllerId}/api/v2/sites/{siteId}/insight/clients` after login still returned `404 Not Found`; appending token changed the response to Omada `-1005 Operation forbidden`. The remaining live-connector task is to match the console's exact post-login request/session convention.
 - Related actions exist for block/unblock/delete client and past connection/portal-auth history, but MVP should stay read-only.
 
 Expected server-side config:

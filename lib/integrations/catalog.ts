@@ -23,10 +23,11 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
   },
   {
     category: "Network",
-    description: "Controller client and usage data",
+    description: "Essentials/free client and usage data",
     id: "network-omada",
     name: "Omada",
-    status: "planned"
+    status: "shape_ready",
+    testPath: "/api/observations/omada/shape"
   },
   {
     category: "Network",
