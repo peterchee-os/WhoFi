@@ -79,13 +79,17 @@ export async function listOmadaClientSnapshots(
   const currentPage = String(query.currentPage ?? 1);
   const currentPageSize = String(query.currentPageSize ?? 100);
   const url = new URL(
-    `/${client.config.controllerId}/api/v2/sites/${client.config.siteId}/insight/clients`,
+    `/openapi/v2/${client.config.controllerId}/sites/${client.config.siteId}/clients`,
     client.config.apiBaseUrl
   );
-  url.searchParams.set("currentPage", currentPage);
-  url.searchParams.set("currentPageSize", currentPageSize);
 
-  const payload = await fetchOmadaJson<OmadaClientListPayload>(client, url, token);
+  const payload = await fetchOmadaJson<OmadaClientListPayload>(client, url, token, {
+    body: {
+      page: Number(currentPage),
+      pageSize: Number(currentPageSize)
+    },
+    method: "POST"
+  });
   return readOmadaRows(payload);
 }
 
@@ -169,13 +173,21 @@ async function loginOmada(client: OmadaClient) {
   return payload.result.token;
 }
 
-async function fetchOmadaJson<T>(client: OmadaClient, url: URL, token: string): Promise<T> {
+async function fetchOmadaJson<T>(
+  client: OmadaClient,
+  url: URL,
+  token: string,
+  options: { body?: unknown; method?: "GET" | "POST" } = {}
+): Promise<T> {
   const response = await fetch(url, {
+    body: options.body ? JSON.stringify(options.body) : undefined,
     headers: {
       Accept: "application/json",
+      "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
       "Csrf-Token": token
     },
+    method: options.method ?? "GET",
     next: {
       revalidate: 0
     }
@@ -183,7 +195,9 @@ async function fetchOmadaJson<T>(client: OmadaClient, url: URL, token: string): 
 
   const payload = await readJson<T & { errorCode?: number; msg?: string }>(response);
   if (!response.ok || (typeof payload.errorCode === "number" && payload.errorCode !== 0)) {
-    const hint = response.status === 404 ? " (login succeeded, client endpoint/session route still needs confirmation)" : "";
+    const hint = response.status === 401 || response.status === 404
+      ? " (login succeeded, OpenAPI client endpoint authorization still needs confirmation)"
+      : "";
     throw new Error(`Omada API ${response.status}: ${redactOmadaError(payload.msg ?? response.statusText)}${hint}`);
   }
 

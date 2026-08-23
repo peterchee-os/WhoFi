@@ -195,9 +195,10 @@ Current browser recon notes:
 - The Essential Controller API host discovered from browser storage was `https://use1-api-omada-essential-controller.tplinkcloud.com`.
 - The console uses a controller/org path segment before `/api/v2`.
 - Browser resource traces confirmed API paths such as `/api/v2/sites/{siteId}/site/workspace`, `/api/v2/sites/{siteId}/dashboard/activeSsids`, and OpenAPI dashboard routes such as `/openapi/v1/{controllerId}/sites/{siteId}/dashboard/active-clients`.
-- Earlier bundle recon suggested a current clients path under `/{controllerId}/api/v2/sites/{siteId}/insight/clients`; keep this as a candidate until the live read-only connector confirms the exact best endpoint.
+- Fresh Clients-table tracing showed the current Essentials client list route is `POST /openapi/v2/{controllerId}/sites/{siteId}/clients`.
+- Earlier bundle recon showed a legacy/alternate current clients path under `/{controllerId}/api/v2/sites/{siteId}/insight/clients`; keep this as a fallback candidate only.
 - Live shell probe with the 1Password credentials confirmed `/{controllerId}/api/v2/login` succeeds and returns an Omada token.
-- Calling `/{controllerId}/api/v2/sites/{siteId}/insight/clients` after login still returned `404 Not Found`; appending token changed the response to Omada `-1005 Operation forbidden`. The remaining live-connector task is to match the console's exact post-login request/session convention.
+- Calling OpenAPI endpoints directly after login still returned Omada authorization failures (`401` / `-44116`) unless the console's internal OpenAPI request helper is used. The remaining live-connector task is to reproduce the console's OpenAPI authorization headers/session convention.
 - Related actions exist for block/unblock/delete client and past connection/portal-auth history, but MVP should stay read-only.
 
 Expected server-side config:
