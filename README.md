@@ -75,6 +75,7 @@ Start here:
 - [Prior Art And Competitive Open Source](docs/engineering/08-prior-art.md)
 - [Automation And AI-Like Usage Detection](docs/engineering/09-automation-and-ai-detection.md)
 - [Notifications](docs/engineering/10-notifications.md)
+- [Database](db/README.md)
 
 ## Keywords
 

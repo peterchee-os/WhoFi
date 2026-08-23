@@ -53,6 +53,11 @@ Identity provider
 10. [Notifications](10-notifications.md)
 11. [Current Handoff](11-current-handoff.md)
 
+## Implementation Artifacts
+
+- [Initial Postgres Migration](../../db/migrations/0001_initial.sql)
+- [Database Notes](../../db/README.md)
+
 ## Non-Goals For MVP
 
 - full NAC
