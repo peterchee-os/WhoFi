@@ -617,6 +617,23 @@ export default function Home() {
     addActivity(setActivity, `Exported stored snapshot capture ${selectedSnapshotCapture.id}`);
   };
 
+  const useSelectedSnapshotCapture = () => {
+    if (!selectedSnapshotCapture) return;
+    const snapshot = selectedSnapshotCapture.deviceSnapshot;
+
+    setDeviceSnapshotSource(snapshot.source);
+    setSourceDevices(snapshot.devices);
+    setSelectedDeviceId(snapshot.devices[0]?.id ?? "");
+    setSnapshotObservedAt(snapshot.observedAt);
+    setSourceState({
+      message: `Loaded stored ${formatDeviceSourceLabel(snapshot.source)} capture`,
+      status: "success",
+      testedAt: new Date().toISOString()
+    });
+    setNotice("Stored capture loaded");
+    addActivity(setActivity, `Loaded stored snapshot capture ${selectedSnapshotCapture.id}`);
+  };
+
   const updateSelectedSnapshotReview = async (reviewed?: boolean) => {
     if (!selectedSnapshotCaptureId) return;
 
@@ -1022,6 +1039,7 @@ export default function Home() {
             onLoadSnapshotCapture={loadSnapshotCapture}
             onSnapshotReviewNoteChange={setSnapshotReviewNoteDraft}
             onUpdateSnapshotReview={updateSelectedSnapshotReview}
+            onUseSelectedSnapshotCapture={useSelectedSnapshotCapture}
             persistedSnapshotCaptureIds={persistedSnapshotCaptureIds}
             selectedSnapshotComparison={selectedSnapshotComparison}
             selectedSnapshotCapture={selectedSnapshotCapture}
@@ -1302,6 +1320,7 @@ function UsageView({
   onLoadSnapshotCapture,
   onSnapshotReviewNoteChange,
   onUpdateSnapshotReview,
+  onUseSelectedSnapshotCapture,
   persistedSnapshotCaptureIds,
   selectedSnapshotComparison,
   selectedSnapshotCapture,
@@ -1317,6 +1336,7 @@ function UsageView({
   onLoadSnapshotCapture: (entryId: string) => void;
   onSnapshotReviewNoteChange: (value: string) => void;
   onUpdateSnapshotReview: (reviewed?: boolean) => void;
+  onUseSelectedSnapshotCapture: () => void;
   persistedSnapshotCaptureIds: string[];
   selectedSnapshotComparison?: SnapshotCaptureComparison;
   selectedSnapshotCapture?: SnapshotCaptureRecord;
@@ -1389,6 +1409,7 @@ function UsageView({
           onExport={onExportSelectedSnapshotCapture}
           onReviewNoteChange={onSnapshotReviewNoteChange}
           onUpdateReview={onUpdateSnapshotReview}
+          onUseCapture={onUseSelectedSnapshotCapture}
           reviewNoteDraft={snapshotReviewNoteDraft}
           state={snapshotCaptureState}
         />
@@ -1463,6 +1484,7 @@ function SnapshotCapturePanel({
   onExport,
   onReviewNoteChange,
   onUpdateReview,
+  onUseCapture,
   reviewNoteDraft,
   state
 }: {
@@ -1472,6 +1494,7 @@ function SnapshotCapturePanel({
   onExport: () => void;
   onReviewNoteChange: (value: string) => void;
   onUpdateReview: (reviewed?: boolean) => void;
+  onUseCapture: () => void;
   reviewNoteDraft: string;
   state: IntegrationTestState;
 }) {
@@ -1494,6 +1517,9 @@ function SnapshotCapturePanel({
           </p>
         </div>
         <div className="panel-actions">
+          <button className="text-button slim" disabled={!capture} onClick={onUseCapture} title="Use stored capture" type="button">
+            Use Snapshot
+          </button>
           <button className="text-button slim" disabled={!capture} onClick={onExport} title="Export selected capture JSON" type="button">
             <Download size={16} />
             Export JSON
