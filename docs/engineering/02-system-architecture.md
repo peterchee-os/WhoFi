@@ -151,4 +151,4 @@ Private deployment:
 - private URLs
 - private database connection
 - private alert destinations
-- private C3Scan/Thinkspace adapter if needed
+- private operator adapter if needed

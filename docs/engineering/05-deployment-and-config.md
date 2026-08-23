@@ -122,6 +122,15 @@ agent_identity:
   heartbeat_enabled: false
   certificate_identity_enabled: false
   default_label_without_evidence: "automation_like"
+
+notifications:
+  email_provider: "${NOTIFICATION_EMAIL_PROVIDER:-console}"
+  from_email: "${NOTIFICATION_FROM_EMAIL}"
+  from_name: "${NOTIFICATION_FROM_NAME:-WhoFi}"
+  reply_to_email: "${NOTIFICATION_REPLY_TO_EMAIL}"
+  batch_settling_minutes: 30
+  operator_digest_recipients:
+    - "ops@example-coworking.test"
 ```
 
 ## Public Repo Files
@@ -166,7 +175,7 @@ WhoFi Thinkspace private deployment
   -> pins WhoFi version
   -> real credentials
   -> real location mappings
-  -> private C3Scan/Supabase adapter if needed
+  -> private operator data adapter if needed
   -> production schedules and alerts
 ```
 

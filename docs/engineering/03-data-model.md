@@ -353,6 +353,33 @@ Alert types:
 - `agent_new_network_segment`
 - `mac_randomization_suspected`
 
+### `email_delivery`
+
+Audit trail for notification sends.
+
+```sql
+email_delivery (
+  id uuid primary key,
+  notification_type text not null,
+  recipient_email citext not null,
+  recipient_name text,
+  provider text not null,
+  provider_message_id text,
+  idempotency_key text not null unique,
+  status text not null,
+  error_code text,
+  error_message text,
+  created_at timestamptz not null default now(),
+  sent_at timestamptz,
+  failed_at timestamptz
+)
+```
+
+Provider values:
+
+- `console`
+- `resend`
+
 ## Automation / Usage Tables
 
 Detailed design:

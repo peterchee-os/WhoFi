@@ -74,6 +74,7 @@ Start here:
 - [MVP Roadmap](docs/engineering/07-mvp-roadmap.md)
 - [Prior Art And Competitive Open Source](docs/engineering/08-prior-art.md)
 - [Automation And AI-Like Usage Detection](docs/engineering/09-automation-and-ai-detection.md)
+- [Notifications](docs/engineering/10-notifications.md)
 
 ## Keywords
 

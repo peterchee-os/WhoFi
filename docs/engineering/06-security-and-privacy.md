@@ -15,6 +15,7 @@ Never commit:
 - real internal IP addresses
 - production database URLs
 - private deployment config
+- Resend API keys
 
 Use fake examples:
 
@@ -51,6 +52,8 @@ Do not collect by default:
 For operator-owned agent hosts, richer heartbeat metadata is acceptable when explicitly configured.
 
 For personal devices, do not infer application/process identity. A laptop with traffic bursts is not automatically an AI agent; it is an automation-like usage signal until linked to explicit evidence.
+
+Email notifications should avoid raw MAC addresses in subject lines and should not send guest/customer emails until templates, consent, and recipient rules are explicit.
 
 ## Secret Handling
 
@@ -120,3 +123,4 @@ Retention must be configurable.
 - allow revocation and expiration
 - make demo fixtures obviously fake
 - keep labels honest: `known_agent` requires identity evidence, while `automation_like` requires only behavioral evidence
+- keep notification providers server-side; `RESEND_API_KEY` must never reach the browser

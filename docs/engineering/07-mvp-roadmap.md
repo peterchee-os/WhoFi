@@ -115,6 +115,10 @@ Deliverables:
 - alert rules
 - alert queue
 - daily digest
+- provider-neutral email notification interface
+- console email provider
+- Resend email provider
+- email delivery log
 - acknowledgement/resolution
 - usage window rollups
 - automation-like signal generation
@@ -136,6 +140,8 @@ Important:
 For MVP, use WiFi traffic-counter signals only. DNS/flow/API-provider detection is optional and should be disabled by default.
 
 Do not market MVP as "AI detection." MVP can show bursty, bot-like, off-hours, or automation-like behavior. A device becomes a known agent only after registration, heartbeat, staff assignment, certificate/RADIUS identity, or another explicit identity source.
+
+Email must default to `console` in development and `disabled` in production unless explicitly configured. Production email should use Resend after sender/domain verification.
 
 ## Phase 6: Optional Captive Portal
 

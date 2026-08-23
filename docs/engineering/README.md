@@ -50,6 +50,7 @@ Identity provider
 7. [MVP Roadmap](07-mvp-roadmap.md)
 8. [Prior Art And Competitive Open Source](08-prior-art.md)
 9. [Automation And AI-Like Usage Detection](09-automation-and-ai-detection.md)
+10. [Notifications](10-notifications.md)
 
 ## Non-Goals For MVP
 
@@ -59,4 +60,4 @@ Identity provider
 - DNS/browsing history surveillance
 - replacing the WiFi controller
 - replacing coworking/property management platforms
-- hardcoded Thinkspace/C3Scan assumptions
+- hardcoded operator-specific assumptions
