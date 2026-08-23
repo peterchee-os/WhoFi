@@ -14,10 +14,14 @@ export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   const source = readSource(request);
+  const verificationOptions = {
+    verificationClientLabel: process.env.WHOFI_VERIFICATION_CLIENT_LABEL,
+    verificationClientMac: process.env.WHOFI_VERIFICATION_CLIENT_MAC
+  };
 
   try {
     if (source === "demo") {
-      return NextResponse.json(buildDemoDeviceSnapshot());
+      return NextResponse.json(buildDemoDeviceSnapshot(verificationOptions));
     }
 
     if (source === "omada") {
@@ -26,12 +30,12 @@ export async function GET(request: NextRequest) {
         currentPage: 1,
         currentPageSize: 100
       });
-      return NextResponse.json(buildDeviceSnapshotFromObservations(source, observations));
+      return NextResponse.json(buildDeviceSnapshotFromObservations(source, observations, undefined, verificationOptions));
     }
 
     const config = getOmadaPrintingPressConfigFromEnv();
     const result = await listOmadaPrintingPressObservations(config);
-    return NextResponse.json(buildDeviceSnapshotFromObservations(source, result.observations));
+    return NextResponse.json(buildDeviceSnapshotFromObservations(source, result.observations, undefined, verificationOptions));
   } catch (error) {
     const message = error instanceof Error ? redactDeviceSourceError(error.message) : "Device snapshot failed";
     const status = message.includes("required") ? 409 : 502;

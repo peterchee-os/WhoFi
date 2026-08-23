@@ -40,6 +40,12 @@ type NotificationRuleKey =
   | "known_agent_missing_heartbeat"
   | "collector_offline";
 
+type DeviceSnapshotVerification = {
+  configured: boolean;
+  label?: string;
+  present: boolean;
+};
+
 type NotificationSettings = {
   providerMode: NotificationProviderMode;
   fromName: string;
@@ -386,6 +392,7 @@ export default function Home() {
         devices?: Device[];
         error?: string;
         source?: DeviceSnapshotSource;
+        verificationClient?: DeviceSnapshotVerification;
       };
       if (!response.ok || !Array.isArray(payload.devices)) {
         throw new Error(payload.error ?? "Device source failed");
@@ -395,7 +402,7 @@ export default function Home() {
       setSourceDevices(payload.devices);
       setSelectedDeviceId(payload.devices[0]?.id ?? "");
       setSourceState({
-        message: `${payload.devices.length} devices`,
+        message: formatSourceStateMessage(payload.devices.length, payload.verificationClient),
         status: "success",
         testedAt: new Date().toISOString()
       });
@@ -1882,6 +1889,11 @@ function formatDeviceSourceLabel(source: DeviceSnapshotSource) {
   if (source === "omada") return "Omada";
   if (source === "omada-pp") return "Omada CLI";
   return "Demo";
+}
+
+function formatSourceStateMessage(count: number, verification?: DeviceSnapshotVerification) {
+  if (!verification?.configured) return `${count} devices`;
+  return `${count} devices / anchor ${verification.present ? "present" : "missing"}`;
 }
 
 function getDeviceLabel(deviceId: string, devices: Device[] = demoDevices) {

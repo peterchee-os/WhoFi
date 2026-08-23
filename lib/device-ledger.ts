@@ -9,21 +9,35 @@ export type DeviceSnapshot = {
   devices: Device[];
   observedAt: string;
   source: DeviceSource;
+  verificationClient?: DeviceSnapshotVerification;
 };
 
-export function buildDemoDeviceSnapshot(): DeviceSnapshot {
+export type DeviceSnapshotVerification = {
+  configured: boolean;
+  label?: string;
+  present: boolean;
+};
+
+export type DeviceSnapshotOptions = {
+  verificationClientMac?: string;
+  verificationClientLabel?: string;
+};
+
+export function buildDemoDeviceSnapshot(options: DeviceSnapshotOptions = {}): DeviceSnapshot {
   return {
     count: demoDevices.length,
     devices: demoDevices,
     observedAt: new Date().toISOString(),
-    source: "demo"
+    source: "demo",
+    verificationClient: verifyClientPresence(demoDevices, options)
   };
 }
 
 export function buildDeviceSnapshotFromObservations(
   source: Exclude<DeviceSource, "demo">,
   observations: NetworkObservation[],
-  observedAt = new Date().toISOString()
+  observedAt = new Date().toISOString(),
+  options: DeviceSnapshotOptions = {}
 ): DeviceSnapshot {
   const devices = observations.map((observation) => deviceFromObservation(source, observation));
 
@@ -31,7 +45,8 @@ export function buildDeviceSnapshotFromObservations(
     count: devices.length,
     devices,
     observedAt,
-    source
+    source,
+    verificationClient: verifyClientPresence(devices, options)
   };
 }
 
@@ -73,4 +88,20 @@ function inferBurstScore(observation: NetworkObservation) {
   if (totalBytes >= 10_000_000_000) return 70;
   if (totalBytes >= 2_000_000_000) return 35;
   return 5;
+}
+
+function verifyClientPresence(devices: Device[], options: DeviceSnapshotOptions): DeviceSnapshotVerification | undefined {
+  const normalizedMac = normalizeMac(options.verificationClientMac);
+  if (!normalizedMac) return undefined;
+
+  return {
+    configured: true,
+    label: options.verificationClientLabel?.trim() || undefined,
+    present: devices.some((device) => normalizeMac(device.mac) === normalizedMac)
+  };
+}
+
+function normalizeMac(value?: string) {
+  const hex = value?.replace(/[^A-Fa-f0-9]/g, "").toLowerCase();
+  return hex?.length === 12 ? hex : undefined;
 }
