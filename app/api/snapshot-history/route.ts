@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuthStatus } from "@/lib/admin-auth";
-import { clearSnapshotHistory, readSnapshotHistory } from "@/lib/snapshot-history-store";
+import { clearSnapshotHistory, readSnapshotCaptures, readSnapshotHistory } from "@/lib/snapshot-history-store";
 
 export const runtime = "nodejs";
 
@@ -17,8 +17,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const entries = await readSnapshotHistory();
+  const includeCaptures = request.nextUrl.searchParams.get("include") === "captures";
+
   return NextResponse.json({
-    entries: await readSnapshotHistory()
+    captures: includeCaptures ? await readSnapshotCaptures() : undefined,
+    entries
   });
 }
 

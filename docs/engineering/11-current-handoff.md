@@ -15,7 +15,7 @@ Latest completed slices:
 - device inspection panel
 - dashboard source switcher for Demo, Omada, and optional Omada Printing Press CLI snapshots
 - Usage view with current snapshot totals, recent history, and rollups by location, SSID, and AP
-- local file-backed snapshot audit history at `.whofi/snapshot-history.json`, with `WHOFI_SNAPSHOT_HISTORY_PATH` override
+- local file-backed snapshot audit history at `.whofi/snapshot-history.json`, with bounded full captures and `WHOFI_SNAPSHOT_HISTORY_PATH` override
 - local review actions: assign, reviewed, watch, block
 - local alert actions: acknowledge, resolve
 - localStorage persistence for demo review state
