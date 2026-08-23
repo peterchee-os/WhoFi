@@ -206,9 +206,74 @@ Expected admin configuration:
 
 OfficeRnD should be an exact integration module, not a generic coworking-system config blob.
 
-## Deskworks / Coworks / Nexudus Connectors
+## Deskworks Connector
 
-These should follow the same exact-module pattern as OfficeRnD and Yardi:
+Deskworks should be an exact module.
+
+Public recon notes:
+
+- Deskworks publishes integration categories for bookings, door access, mail, payments, printing, WiFi network, and automation.
+- Deskworks specifically describes WiFi network integrations that can log member check-ins through network activity.
+- Deskworks reporting pages describe member, occupancy, utilization, check-in, day-pass, plan, and revenue reporting.
+- Public pages mention an open API, but a complete endpoint reference was not found during initial recon.
+
+Responsibilities:
+
+- authenticate using operator-scoped API credentials when available
+- list members/people
+- list companies/accounts
+- list plans/memberships or usage allowances when available
+- list locations/resources where useful
+- ingest check-ins or usage records if exposed
+- map WiFi/network check-in concepts into WhoFi identity evidence
+- support CSV/manual fallback if API access requires vendor enablement
+
+Expected admin configuration:
+
+- API base URL or tenant/org identifier, if applicable
+- API key/client credentials, write-only
+- enable/disable toggle
+- test connection
+- last test result/error/timestamp
+
+Deskworks is especially interesting for WhoFi because its product language already connects WiFi activity, check-ins, usage tracking, and billing.
+
+## Nexudus Connector
+
+Nexudus should be an exact module.
+
+Public recon notes:
+
+- Nexudus has developer resources for REST API, Public API, Marketplaces API, Environment API, Access Control, Network Bridge, CLI, and SDK.
+- Nexudus REST API is described as covering locations, customers, bookings, billing, and related resources.
+- Nexudus add-ons use registered application credentials.
+- For WiFi entitlement checks, an MVP can either sync members/customers periodically or make a real-time eligibility call during captive portal login.
+
+Responsibilities:
+
+- authenticate through a registered Nexudus app/add-on
+- list customers/people
+- list companies/teams where available
+- list locations
+- list plans/memberships/contracts
+- list bookings if useful for event/day-pass entitlement
+- support real-time member eligibility lookup by email or identifier
+- optionally use Network Bridge or access-control concepts later if they help local-controller deployment
+
+Expected admin configuration:
+
+- app key/client id
+- app secret/client secret, write-only
+- account/location scope
+- enable/disable toggle
+- test connection
+- last test result/error/timestamp
+
+Nexudus is likely one of the cleaner exact modules because the public developer surface is broad and API-first.
+
+## Coworks Connector
+
+Coworks should follow the same exact-module pattern as OfficeRnD, Yardi, Deskworks, and Nexudus:
 
 - named module per vendor
 - provider-specific config fields

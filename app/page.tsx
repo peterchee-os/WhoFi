@@ -1032,6 +1032,18 @@ function IntegrationCards({
       description: "Coworking member and company source",
       id: "identity-officernd",
       name: "OfficeRnD"
+    },
+    {
+      category: "Identity",
+      description: "Coworking member, plan, and usage source",
+      id: "identity-deskworks",
+      name: "Deskworks"
+    },
+    {
+      category: "Identity",
+      description: "API-first member and location source",
+      id: "identity-nexudus",
+      name: "Nexudus"
     }
   ];
 
