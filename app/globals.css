@@ -350,6 +350,11 @@ textarea {
   min-height: 32px;
 }
 
+.icon-button.compact {
+  width: 34px;
+  min-height: 34px;
+}
+
 .text-button.danger {
   color: var(--red);
 }

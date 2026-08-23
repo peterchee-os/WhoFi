@@ -596,6 +596,24 @@ export default function Home() {
     }
   };
 
+  const exportSelectedSnapshotCapture = () => {
+    if (!selectedSnapshotCapture) return;
+    const payload = {
+      capture: selectedSnapshotCapture,
+      comparison: selectedSnapshotComparison,
+      exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `whofi-capture-${selectedSnapshotCapture.id}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setNotice("Capture exported");
+    addActivity(setActivity, `Exported stored snapshot capture ${selectedSnapshotCapture.id}`);
+  };
+
   const loadSnapshotCapture = async (entryId: string) => {
     setSelectedSnapshotCaptureId(entryId);
     setSnapshotCaptureState({
@@ -948,6 +966,7 @@ export default function Home() {
           <UsageView
             onClearSnapshotHistory={clearSnapshotHistory}
             onDeleteSelectedSnapshotCapture={deleteSelectedSnapshotCapture}
+            onExportSelectedSnapshotCapture={exportSelectedSnapshotCapture}
             onLoadSnapshotCapture={loadSnapshotCapture}
             persistedSnapshotCaptureIds={persistedSnapshotCaptureIds}
             selectedSnapshotComparison={selectedSnapshotComparison}
@@ -1224,6 +1243,7 @@ function DevicesView({
 function UsageView({
   onClearSnapshotHistory,
   onDeleteSelectedSnapshotCapture,
+  onExportSelectedSnapshotCapture,
   onLoadSnapshotCapture,
   persistedSnapshotCaptureIds,
   selectedSnapshotComparison,
@@ -1235,6 +1255,7 @@ function UsageView({
 }: {
   onClearSnapshotHistory: () => void;
   onDeleteSelectedSnapshotCapture: () => void;
+  onExportSelectedSnapshotCapture: () => void;
   onLoadSnapshotCapture: (entryId: string) => void;
   persistedSnapshotCaptureIds: string[];
   selectedSnapshotComparison?: SnapshotCaptureComparison;
@@ -1304,6 +1325,7 @@ function UsageView({
           capture={selectedSnapshotCapture}
           comparison={selectedSnapshotComparison}
           onDelete={onDeleteSelectedSnapshotCapture}
+          onExport={onExportSelectedSnapshotCapture}
           state={snapshotCaptureState}
         />
         <UsageRollupPanel
@@ -1374,11 +1396,13 @@ function SnapshotCapturePanel({
   capture,
   comparison,
   onDelete,
+  onExport,
   state
 }: {
   capture?: SnapshotCaptureRecord;
   comparison?: SnapshotCaptureComparison;
   onDelete: () => void;
+  onExport: () => void;
   state: IntegrationTestState;
 }) {
   const topDevices = capture
@@ -1400,6 +1424,9 @@ function SnapshotCapturePanel({
           </p>
         </div>
         <div className="panel-actions">
+          <button className="icon-button compact" disabled={!capture} onClick={onExport} title="Export capture" type="button">
+            <Download size={16} />
+          </button>
           <button className="text-button slim" disabled={!capture} onClick={onDelete} type="button">
             Delete
           </button>
