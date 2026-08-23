@@ -201,8 +201,10 @@ Current implementation state:
 
 - `GET /api/providers/network/status` reports Omada and Cisco Meraki config readiness from server-side env vars, including whether live snapshots are enabled for Omada rows.
 - `GET /api/observations/omada/cli-doctor` runs the optional Omada Printing Press CLI readiness check and returns only check names/statuses.
+- `POST /api/snapshot-history/capture?source=demo|omada|omada-pp` captures a selected-source snapshot and writes it to the local audit store.
 - `GET /api/snapshot-history` returns recent local file-backed snapshot audit entries; `GET /api/snapshot-history?include=captures` includes recent full captures; `GET /api/snapshot-history/{id}` returns one capture; `DELETE /api/snapshot-history` clears them.
-- The dashboard device source switcher keeps demo devices as the default and only loads live Omada or Omada Printing Press snapshots after an explicit operator click.
+- `GET /api/devices?source=demo|omada|omada-pp` returns a selected-source read-only snapshot without writing audit history.
+- The dashboard device source switcher keeps demo devices as the default and only captures live Omada or Omada Printing Press snapshots after an explicit operator click.
 - `WHOFI_REQUIRE_ADMIN_AUTH=true` enables app-level admin sign-in before the dashboard and API-level auth checks around live/provider routes.
 - `WHOFI_SNAPSHOT_HISTORY_PATH` can override the default local history file path, `.whofi/snapshot-history.json`.
 - `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true` is required before `/api/devices?source=omada` or `source=omada-pp` returns live network rows. Keep it false for public demos and unauthenticated deployments.

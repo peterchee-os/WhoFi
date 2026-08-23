@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminAuthStatus } from "@/lib/admin-auth";
 import {
   getLiveSourceAccessError,
   loadDeviceSnapshot,
   readDeviceSource,
   redactDeviceSourceError
 } from "@/lib/device-snapshots";
-import { getAdminAuthStatus } from "@/lib/admin-auth";
+import { appendSnapshotHistory } from "@/lib/snapshot-history-store";
 
 export const runtime = "nodejs";
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   const adminStatus = getAdminAuthStatus(request);
   if (!adminStatus.authenticated) {
     return NextResponse.json(
@@ -38,9 +39,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    return NextResponse.json(await loadDeviceSnapshot(source));
+    const snapshot = await loadDeviceSnapshot(source);
+    const snapshotHistory = await appendSnapshotHistory(snapshot);
+    return NextResponse.json({
+      ...snapshot,
+      snapshotHistory
+    });
   } catch (error) {
-    const message = error instanceof Error ? redactDeviceSourceError(error.message) : "Device snapshot failed";
+    const message = error instanceof Error ? redactDeviceSourceError(error.message) : "Snapshot capture failed";
     const status = message.includes("required") ? 409 : 502;
 
     return NextResponse.json(

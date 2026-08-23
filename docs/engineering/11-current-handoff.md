@@ -26,6 +26,7 @@ Latest completed slices:
 - live device snapshot gate via `WHOFI_ENABLE_LIVE_DEVICE_SOURCES`
 - optional live source token via `WHOFI_LIVE_DEVICE_SOURCE_TOKEN`
 - `/api/sessions` endpoint with the same source, gate, and token behavior as `/api/devices`
+- `POST /api/snapshot-history/capture` endpoint for write/capture semantics; `/api/devices` remains read-only
 - optional app-level admin gate via `WHOFI_REQUIRE_ADMIN_AUTH`, `WHOFI_ADMIN_PASSWORD`, and `WHOFI_ADMIN_SESSION_SECRET`
 
 The UI intentionally avoids visible product-mode tabs such as event/coworking/home. The product can support those contexts internally, but the operator experience should stay focused on who and what is on the WiFi.

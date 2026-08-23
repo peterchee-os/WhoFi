@@ -594,24 +594,7 @@ export default function Home() {
       status: "testing"
     });
 
-    if (source === "demo") {
-      setDeviceSnapshotSource("demo");
-      setSourceDevices(demoDevices);
-      setSelectedDeviceId("dev-unknown-burst");
-      const observedAt = new Date().toISOString();
-      setSnapshotObservedAt(observedAt);
-      recordSnapshotHistory("demo", demoDevices, observedAt);
-      setSourceState({
-        message: "Demo",
-        status: "success",
-        testedAt: observedAt
-      });
-      setNotice("Demo snapshot loaded");
-      addActivity(setActivity, "Loaded demo device snapshot");
-      return;
-    }
-
-    if (!liveSourceAccess.enabled) {
+    if (source !== "demo" && !liveSourceAccess.enabled) {
       setSourceState({
         message: liveSourceAccess.loaded ? "Live off" : "Checking",
         status: liveSourceAccess.loaded ? "error" : "testing",
@@ -623,7 +606,10 @@ export default function Home() {
 
     try {
       const headers = liveSourceToken.trim() ? { "X-WhoFi-Live-Source-Token": liveSourceToken.trim() } : undefined;
-      const response = await fetch(`/api/devices?source=${source}`, { headers });
+      const response = await fetch(`/api/snapshot-history/capture?source=${source}`, {
+        headers,
+        method: "POST"
+      });
       const payload = (await response.json()) as {
         devices?: Device[];
         error?: string;
@@ -644,6 +630,7 @@ export default function Home() {
       if (payload.snapshotHistory?.length) {
         setPersistedSnapshotCaptureIds(payload.snapshotHistory.map((entry) => entry.id));
         setSnapshotHistory((current) => mergeSnapshotHistory(payload.snapshotHistory ?? [], current).slice(0, 10));
+        void loadSnapshotCapture(payload.snapshotHistory[0].id);
       } else {
         recordSnapshotHistory(source, payload.devices, observedAt);
       }
@@ -652,8 +639,8 @@ export default function Home() {
         status: "success",
         testedAt: observedAt
       });
-      setNotice("Snapshot loaded");
-      addActivity(setActivity, `Loaded ${formatDeviceSourceLabel(source)} device snapshot (${payload.devices.length} devices)`);
+      setNotice("Snapshot captured");
+      addActivity(setActivity, `Captured ${formatDeviceSourceLabel(source)} device snapshot (${payload.devices.length} devices)`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Device source failed";
       setSourceState({
@@ -2568,10 +2555,10 @@ function formatDeviceSourceLabel(source: DeviceSnapshotSource) {
 }
 
 function getDeviceSourceTitle(source: DeviceSnapshotSource, liveSourceAccess: LiveSourceAccess) {
-  if (source === "demo") return "Load Demo devices";
+  if (source === "demo") return "Capture Demo devices";
   if (!liveSourceAccess.loaded) return "Checking live source access";
   if (!liveSourceAccess.enabled) return "Live snapshots disabled";
-  return `Load ${formatDeviceSourceLabel(source)} devices`;
+  return `Capture ${formatDeviceSourceLabel(source)} devices`;
 }
 
 function mergeSnapshotHistory(...entrySets: SnapshotHistoryEntry[][]) {
