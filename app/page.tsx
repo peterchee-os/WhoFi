@@ -84,6 +84,14 @@ type CsvPreviewState = {
   };
 };
 
+type NetworkProviderConfigStatus = {
+  configured: boolean;
+  displayName: string;
+  missing: string[];
+  providerId: string;
+  required: string[];
+};
+
 type ReviewState = {
   activity: ActivityEntry[];
   alertStatusOverrides: Record<string, AlertStatus>;
@@ -907,6 +915,7 @@ function SettingsView({
 
       <div className="side-stack">
         <IntegrationCards onAddActivity={onAddActivity} onNotice={onNotice} />
+        <NetworkProviderStatus />
         <CsvImportPreview onAddActivity={onAddActivity} onNotice={onNotice} />
 
         <section className="panel">
@@ -1141,6 +1150,69 @@ function formatIntegrationStatus(status: IntegrationCatalogItem["status"]) {
   if (status === "demo") return "demo";
   if (status === "shape_ready") return "shape ready";
   return "planned";
+}
+
+function NetworkProviderStatus() {
+  const [providers, setProviders] = useState<NetworkProviderConfigStatus[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/providers/network/status")
+      .then((response) => response.json())
+      .then((payload) => {
+        if (cancelled) return;
+        setProviders(payload.providers ?? []);
+        setLoaded(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setProviders([]);
+        setLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <h3>Network Config</h3>
+          <p>Server-side readiness.</p>
+        </div>
+        <Wifi size={20} color="var(--teal-dark)" />
+      </div>
+      <div className="status-list provider-status-list">
+        {!loaded ? (
+          <div className="provider-status-row">
+            <strong>Loading</strong>
+            <span className="integration-state testing">Checking</span>
+          </div>
+        ) : null}
+        {loaded && providers.length === 0 ? (
+          <div className="provider-status-row">
+            <strong>Unavailable</strong>
+            <span className="integration-state error">Error</span>
+          </div>
+        ) : null}
+        {providers.map((provider) => (
+          <div className="provider-status-row" key={provider.providerId}>
+            <div>
+              <strong>{provider.displayName}</strong>
+              <span>{provider.configured ? "Required env present" : `Missing ${provider.missing.join(", ")}`}</span>
+            </div>
+            <span className={`integration-state ${provider.configured ? "success" : "idle"}`}>
+              {provider.configured ? "Configured" : "Missing"}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function CsvImportPreview({

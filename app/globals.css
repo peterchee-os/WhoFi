@@ -688,6 +688,35 @@ textarea {
   padding: 16px 18px 18px;
 }
 
+.provider-status-list {
+  display: grid;
+  gap: 12px;
+}
+
+.provider-status-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.provider-status-row div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.provider-status-row strong {
+  font-size: 14px;
+}
+
+.provider-status-row span:not(.integration-state) {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .rule-list {
   display: grid;
 }

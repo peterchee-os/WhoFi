@@ -175,10 +175,17 @@ Each production integration should have:
 - exact config schema
 - exact admin card
 - exact test connection route
+- config readiness endpoint that reports missing fields without exposing values
 - exact sync/webhook handlers when needed
 - normalized output into WhoFi profiles, entitlements, locations, and observations
 
 Public repo examples can include fake values and `.env.example` entries. Real operator config belongs in private deployment config or deployment secret storage.
+
+Current implementation state:
+
+- `GET /api/providers/network/status` reports Omada and Cisco Meraki config readiness from server-side env vars.
+- Settings shows whether required env vars are present.
+- The endpoint returns missing env var names only, never secret values.
 
 ## Public Repo Files
 
