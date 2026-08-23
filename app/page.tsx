@@ -96,6 +96,7 @@ type NetworkProviderConfigStatus = {
   configured: boolean;
   detail?: string;
   displayName: string;
+  liveSnapshotsEnabled?: boolean;
   missing: string[];
   providerId: string;
   required: string[];
@@ -1405,6 +1406,9 @@ function NetworkProviderStatus({
               <strong>{provider.displayName}</strong>
               {provider.detail ? <span>{provider.detail}</span> : null}
               <span>{provider.configured ? "Required env present" : `Missing ${provider.missing.join(", ")}`}</span>
+              {typeof provider.liveSnapshotsEnabled === "boolean" ? (
+                <span>{provider.liveSnapshotsEnabled ? "Live snapshots enabled" : "Live snapshots disabled"}</span>
+              ) : null}
             </div>
             <div className="provider-status-actions">
               {provider.providerId === "omada-printing-press" && provider.configured ? (

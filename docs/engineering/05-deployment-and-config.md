@@ -187,7 +187,7 @@ Public repo examples can include fake values and `.env.example` entries. Real op
 
 Current implementation state:
 
-- `GET /api/providers/network/status` reports Omada and Cisco Meraki config readiness from server-side env vars.
+- `GET /api/providers/network/status` reports Omada and Cisco Meraki config readiness from server-side env vars, including whether live snapshots are enabled for Omada rows.
 - `GET /api/observations/omada/cli-doctor` runs the optional Omada Printing Press CLI readiness check and returns only check names/statuses.
 - The dashboard device source switcher keeps demo devices as the default and only loads live Omada or Omada Printing Press snapshots after an explicit operator click.
 - `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true` is required before `/api/devices?source=omada` or `source=omada-pp` returns live network rows. Keep it false for public demos and unauthenticated deployments.
