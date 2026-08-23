@@ -1003,7 +1003,7 @@ function DeviceLedger({
             <th style={{ width: "18%" }}>Network</th>
             <th style={{ width: "17%" }}>Usage</th>
             <th style={{ width: "15%" }}>Signal</th>
-            <th style={{ width: "4%" }} aria-label="Inspect" />
+              <th className="action-column" aria-label="Inspect" />
           </tr>
         </thead>
         <tbody>

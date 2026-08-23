@@ -294,10 +294,11 @@ textarea {
 .table-scroll {
   width: 100%;
   overflow-x: auto;
+  padding-right: 1px;
 }
 
 .ledger-table {
-  min-width: 900px;
+  min-width: 980px;
 }
 
 .delivery-table {
@@ -321,6 +322,19 @@ textarea {
 .device-table td {
   font-size: 14px;
   min-width: 0;
+}
+
+.ledger-table .action-column,
+.ledger-table td:last-child {
+  width: 88px;
+  padding-left: 12px;
+  padding-right: 18px;
+  text-align: center;
+}
+
+.ledger-table .table-action {
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .device-table tr.selected-row td {
