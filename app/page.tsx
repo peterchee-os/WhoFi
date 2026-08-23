@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -20,7 +20,7 @@ import {
 import { StatusBadge } from "@/components/StatusBadge";
 import { demoAlerts, demoDevices, demoProfiles } from "@/lib/demo-data";
 import { formatBytes, formatRelativeTime, percent } from "@/lib/format";
-import type { Device, Profile } from "@/lib/types";
+import type { Device, DeviceStatus, Profile, RiskState } from "@/lib/types";
 
 type View = "dashboard" | "devices" | "profiles" | "alerts";
 
@@ -31,13 +31,7 @@ const navItems: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: "alerts", label: "Alerts", icon: AlertTriangle }
 ];
 
-const totalBytes = demoDevices.reduce((sum, device) => sum + device.rxBytes + device.txBytes, 0);
-const unknownDevices = demoDevices.filter((device) => device.status === "unknown").length;
-const automationSignals = demoDevices.filter((device) =>
-  ["automation_like", "possible_bot", "known_agent", "watch"].includes(device.riskState)
-).length;
 const openAlerts = demoAlerts.filter((alert) => alert.status === "open").length;
-const maxUsage = Math.max(...demoDevices.map((device) => device.rxBytes + device.txBytes));
 
 const profileById = new Map(demoProfiles.map((profile) => [profile.id, profile]));
 const ownerMix = [
@@ -70,12 +64,27 @@ export default function Home() {
   const [activeView, setActiveView] = useState<View>("dashboard");
   const [query, setQuery] = useState("");
   const [selectedDeviceId, setSelectedDeviceId] = useState("dev-unknown-burst");
+  const [profileOverrides, setProfileOverrides] = useState<Record<string, string | undefined>>({});
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, DeviceStatus>>({});
+  const [riskOverrides, setRiskOverrides] = useState<Record<string, RiskState>>({});
+
+  const devices = useMemo(() => {
+    return demoDevices.map((device) => ({
+      ...device,
+      profileId: profileOverrides[device.id] ?? device.profileId,
+      status: statusOverrides[device.id] ?? device.status,
+      riskState: riskOverrides[device.id] ?? device.riskState
+    }));
+  }, [profileOverrides, riskOverrides, statusOverrides]);
+
+  const metrics = useMemo(() => getMetrics(devices), [devices]);
+  const maxUsage = useMemo(() => Math.max(...devices.map((device) => device.rxBytes + device.txBytes)), [devices]);
 
   const filteredDevices = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return demoDevices;
+    if (!normalizedQuery) return devices;
 
-    return demoDevices.filter((device) => {
+    return devices.filter((device) => {
       const profile = device.profileId ? profileById.get(device.profileId) : undefined;
       return [
         device.hostname,
@@ -91,10 +100,24 @@ export default function Home() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalizedQuery));
     });
-  }, [query]);
+  }, [devices, query]);
 
   const title = viewTitles[activeView];
-  const selectedDevice = demoDevices.find((device) => device.id === selectedDeviceId) ?? demoDevices[0];
+  const selectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? devices[0];
+
+  const assignDevice = (deviceId: string, profileId: string) => {
+    setProfileOverrides((current) => ({ ...current, [deviceId]: profileId }));
+    setStatusOverrides((current) => ({ ...current, [deviceId]: "claimed" }));
+  };
+
+  const setDeviceRisk = (deviceId: string, riskState: RiskState) => {
+    setRiskOverrides((current) => ({ ...current, [deviceId]: riskState }));
+  };
+
+  const blockDevice = (deviceId: string) => {
+    setStatusOverrides((current) => ({ ...current, [deviceId]: "revoked" }));
+    setRiskOverrides((current) => ({ ...current, [deviceId]: "needs_review" }));
+  };
 
   return (
     <main className="app-shell">
@@ -126,7 +149,7 @@ export default function Home() {
 
         <div className="sidebar-section">
           <p>Current snapshot</p>
-          <p>6 devices, 5 profiles, 2 open review signals.</p>
+          <p>{metrics.onlineDevices} devices, {demoProfiles.length} profiles, {metrics.reviewSignals} review signals.</p>
         </div>
       </aside>
 
@@ -156,18 +179,30 @@ export default function Home() {
           </div>
         </header>
 
-        <Metrics />
+        <Metrics metrics={metrics} />
 
         {activeView === "dashboard" ? (
           <DashboardView
             devices={filteredDevices}
+            maxUsage={maxUsage}
+            onAssignDevice={assignDevice}
+            onBlockDevice={blockDevice}
             onSelectDevice={setSelectedDeviceId}
+            onSetDeviceRisk={setDeviceRisk}
             selectedDevice={selectedDevice}
             selectedDeviceId={selectedDeviceId}
           />
         ) : null}
         {activeView === "devices" ? (
-          <DevicesView devices={filteredDevices} onSelectDevice={setSelectedDeviceId} selectedDeviceId={selectedDeviceId} />
+          <DevicesView
+            devices={filteredDevices}
+            maxUsage={maxUsage}
+            onAssignDevice={assignDevice}
+            onBlockDevice={blockDevice}
+            onSelectDevice={setSelectedDeviceId}
+            onSetDeviceRisk={setDeviceRisk}
+            selectedDeviceId={selectedDeviceId}
+          />
         ) : null}
         {activeView === "profiles" ? <ProfilesView profiles={demoProfiles} /> : null}
         {activeView === "alerts" ? <AlertsView /> : null}
@@ -176,24 +211,39 @@ export default function Home() {
   );
 }
 
-function Metrics() {
+function getMetrics(devices: Device[]) {
+  const totalBytes = devices.reduce((sum, device) => sum + device.rxBytes + device.txBytes, 0);
+  const unknownDevices = devices.filter((device) => device.status === "unknown").length;
+  const reviewSignals = devices.filter((device) =>
+    ["automation_like", "possible_bot", "needs_review", "watch"].includes(device.riskState)
+  ).length;
+
+  return {
+    onlineDevices: devices.length,
+    reviewSignals,
+    totalBytes,
+    unknownDevices
+  };
+}
+
+function Metrics({ metrics }: { metrics: ReturnType<typeof getMetrics> }) {
   return (
     <section className="metric-grid" aria-label="Current metrics">
       <div className="metric">
         <span>Online devices</span>
-        <strong>{demoDevices.length}</strong>
+        <strong>{metrics.onlineDevices}</strong>
       </div>
       <div className="metric">
         <span>Unknown devices</span>
-        <strong>{unknownDevices}</strong>
+        <strong>{metrics.unknownDevices}</strong>
       </div>
       <div className="metric">
         <span>Tracked usage</span>
-        <strong>{formatBytes(totalBytes)}</strong>
+        <strong>{formatBytes(metrics.totalBytes)}</strong>
       </div>
       <div className="metric">
         <span>Review signals</span>
-        <strong>{openAlerts}</strong>
+        <strong>{metrics.reviewSignals}</strong>
       </div>
     </section>
   );
@@ -201,21 +251,40 @@ function Metrics() {
 
 function DashboardView({
   devices,
+  maxUsage,
+  onAssignDevice,
+  onBlockDevice,
   onSelectDevice,
+  onSetDeviceRisk,
   selectedDevice,
   selectedDeviceId
 }: {
   devices: Device[];
+  maxUsage: number;
+  onAssignDevice: (deviceId: string, profileId: string) => void;
+  onBlockDevice: (deviceId: string) => void;
   onSelectDevice: (deviceId: string) => void;
+  onSetDeviceRisk: (deviceId: string, riskState: RiskState) => void;
   selectedDevice: Device;
   selectedDeviceId: string;
 }) {
   return (
     <section className="content-grid">
-      <DeviceLedger devices={devices} compact onSelectDevice={onSelectDevice} selectedDeviceId={selectedDeviceId} />
+      <DeviceLedger
+        devices={devices}
+        compact
+        maxUsage={maxUsage}
+        onSelectDevice={onSelectDevice}
+        selectedDeviceId={selectedDeviceId}
+      />
 
       <div className="side-stack">
-        <DeviceInspector device={selectedDevice} />
+        <DeviceInspector
+          device={selectedDevice}
+          onAssignDevice={onAssignDevice}
+          onBlockDevice={onBlockDevice}
+          onSetDeviceRisk={onSetDeviceRisk}
+        />
         <OwnerMix />
         <AlertQueue limit={3} />
       </div>
@@ -225,19 +294,38 @@ function DashboardView({
 
 function DevicesView({
   devices,
+  maxUsage,
+  onAssignDevice,
+  onBlockDevice,
   onSelectDevice,
+  onSetDeviceRisk,
   selectedDeviceId
 }: {
   devices: Device[];
+  maxUsage: number;
+  onAssignDevice: (deviceId: string, profileId: string) => void;
+  onBlockDevice: (deviceId: string) => void;
   onSelectDevice: (deviceId: string) => void;
+  onSetDeviceRisk: (deviceId: string, riskState: RiskState) => void;
   selectedDeviceId: string;
 }) {
   const selectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? devices[0];
 
   return (
     <section className="content-grid detail-layout">
-      <DeviceLedger devices={devices} onSelectDevice={onSelectDevice} selectedDeviceId={selectedDeviceId} />
-      <div className="side-stack">{selectedDevice ? <DeviceInspector device={selectedDevice} /> : <EmptyPanel />}</div>
+      <DeviceLedger devices={devices} maxUsage={maxUsage} onSelectDevice={onSelectDevice} selectedDeviceId={selectedDeviceId} />
+      <div className="side-stack">
+        {selectedDevice ? (
+          <DeviceInspector
+            device={selectedDevice}
+            onAssignDevice={onAssignDevice}
+            onBlockDevice={onBlockDevice}
+            onSetDeviceRisk={onSetDeviceRisk}
+          />
+        ) : (
+          <EmptyPanel />
+        )}
+      </div>
     </section>
   );
 }
@@ -272,11 +360,13 @@ function AlertsView() {
 function DeviceLedger({
   devices,
   compact = false,
+  maxUsage,
   onSelectDevice,
   selectedDeviceId
 }: {
   devices: Device[];
   compact?: boolean;
+  maxUsage: number;
   onSelectDevice: (deviceId: string) => void;
   selectedDeviceId: string;
 }) {
@@ -289,7 +379,13 @@ function DeviceLedger({
           <h3>Device Ledger</h3>
           <p>{shownDevices.length} current clients.</p>
         </div>
-        <StatusBadge state={automationSignals > 0 ? "needs_review" : "normal"} />
+        <StatusBadge
+          state={
+            devices.some((device) => ["automation_like", "possible_bot", "needs_review", "watch"].includes(device.riskState))
+              ? "needs_review"
+              : "normal"
+          }
+        />
       </div>
 
       <table className="device-table">
@@ -356,9 +452,25 @@ function DeviceLedger({
   );
 }
 
-function DeviceInspector({ device }: { device: Device }) {
+function DeviceInspector({
+  device,
+  onAssignDevice,
+  onBlockDevice,
+  onSetDeviceRisk
+}: {
+  device: Device;
+  onAssignDevice: (deviceId: string, profileId: string) => void;
+  onBlockDevice: (deviceId: string) => void;
+  onSetDeviceRisk: (deviceId: string, riskState: RiskState) => void;
+}) {
+  const [selectedProfileId, setSelectedProfileId] = useState(device.profileId ?? demoProfiles[0].id);
   const profile = device.profileId ? profileById.get(device.profileId) : undefined;
   const usage = device.rxBytes + device.txBytes;
+  const assignProfileId = selectedProfileId || demoProfiles[0].id;
+
+  useEffect(() => {
+    setSelectedProfileId(device.profileId ?? demoProfiles[0].id);
+  }, [device.id, device.profileId]);
 
   return (
     <section className="panel">
@@ -374,6 +486,17 @@ function DeviceInspector({ device }: { device: Device }) {
           <strong>{profile?.displayName ?? "Unclaimed"}</strong>
           <span>{profile?.organizationName ?? "No owner assigned"}</span>
         </div>
+
+        <label className="select-field">
+          <span>Owner</span>
+          <select value={selectedProfileId} onChange={(event) => setSelectedProfileId(event.target.value)}>
+            {demoProfiles.map((candidate) => (
+              <option key={candidate.id} value={candidate.id}>
+                {candidate.displayName}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <dl className="kv-list">
           <div>
@@ -403,19 +526,19 @@ function DeviceInspector({ device }: { device: Device }) {
         </dl>
 
         <div className="action-grid">
-          <button className="text-button" title="Assign owner">
+          <button className="text-button" onClick={() => onAssignDevice(device.id, assignProfileId)} title="Assign owner">
             <UserPlus size={17} />
             Assign
           </button>
-          <button className="text-button" title="Mark reviewed">
+          <button className="text-button" onClick={() => onSetDeviceRisk(device.id, "normal")} title="Mark reviewed">
             <Check size={17} />
             Reviewed
           </button>
-          <button className="text-button" title="Watch device">
+          <button className="text-button" onClick={() => onSetDeviceRisk(device.id, "watch")} title="Watch device">
             <Eye size={17} />
             Watch
           </button>
-          <button className="text-button danger" title="Block device">
+          <button className="text-button danger" onClick={() => onBlockDevice(device.id)} title="Block device">
             <Ban size={17} />
             Block
           </button>

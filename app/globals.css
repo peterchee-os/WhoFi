@@ -447,6 +447,27 @@ select {
   font-size: 13px;
 }
 
+.select-field {
+  display: grid;
+  gap: 7px;
+}
+
+.select-field span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.select-field select {
+  width: 100%;
+  min-height: 38px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--ink);
+  padding: 0 10px;
+}
+
 .kv-list {
   display: grid;
   gap: 10px;
