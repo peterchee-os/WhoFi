@@ -159,7 +159,7 @@ Status:
 - Private CLI now includes `whofi doctor` and `whofi doctor --live`; live doctor checks config, base URL parsing, login, and active-client endpoint readiness without emitting observations.
 - Private smoke script `smoke-omada-pp.sh` runs missing-config, offline doctor, live doctor, and sanitized live observation summary. Active-client counts are live telemetry and should be expected to fluctuate.
 - Bad-site-id live negative path is scripted and fails cleanly at the active-client endpoint without emitting observations.
-- Additional negative-path case still needed: no network/timeout.
+- Connectivity/timeout live negative path is scripted with a short configurable timeout and fails cleanly at login without emitting observations.
 
 ## Phase 5: Decide Runtime Integration
 
@@ -226,7 +226,6 @@ Current best next task:
 
 ```text
 Harden the private Omada CLI and bridge:
-  finish scripted negative-path tests,
   identify a post-generation hook or cleaner companion-module strategy.
 ```
 
