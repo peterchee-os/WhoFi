@@ -697,14 +697,12 @@ function SettingsView({
     });
   };
 
-  const sendTestEmail = () => {
+  const sendTestEmail = async () => {
     const recipient = getFirstRecipient(settings.criticalRecipients) ?? getFirstRecipient(settings.digestRecipients);
-    const createdAt = new Date().toISOString();
-    const providerMessageId = settings.providerMode === "resend" ? "demo_resend_pending" : undefined;
 
     if (!recipient) {
       const delivery = createEmailDelivery({
-        createdAt,
+        createdAt: new Date().toISOString(),
         error: "No test recipient configured",
         notificationType: "test_email",
         provider: settings.providerMode,
@@ -717,34 +715,56 @@ function SettingsView({
       return;
     }
 
-    if (settings.providerMode === "disabled") {
+    try {
+      const response = await fetch("/api/notifications/test", {
+        body: JSON.stringify({
+          fromEmail: settings.fromEmail,
+          fromName: settings.fromName,
+          providerMode: settings.providerMode,
+          recipient,
+          replyToEmail: settings.replyToEmail
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const payload = (await response.json()) as { delivery?: EmailDelivery };
+      const delivery = payload.delivery;
+
+      if (!delivery) {
+        throw new Error("Missing delivery response");
+      }
+
+      onDelivery(delivery);
+
+      if (delivery.status === "disabled") {
+        onNotice("Email disabled");
+        onAddActivity("Test email skipped because delivery is disabled");
+      } else if (delivery.status === "rendered") {
+        onNotice("Rendered locally");
+        onAddActivity(`Rendered test email for ${recipient}`);
+      } else if (delivery.status === "sent") {
+        onNotice("Test sent");
+        onAddActivity(`Sent test email for ${recipient}`);
+      } else {
+        onNotice("Test failed");
+        onAddActivity(`Test email failed: ${delivery.error ?? "provider error"}`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Request failed";
       const delivery = createEmailDelivery({
-        createdAt,
-        error: "Email delivery is disabled",
+        createdAt: new Date().toISOString(),
+        error: message,
         notificationType: "test_email",
-        provider: "disabled",
+        provider: settings.providerMode,
         recipient,
-        status: "disabled"
+        status: "failed"
       });
       onDelivery(delivery);
-      onNotice("Email disabled");
-      onAddActivity("Test email skipped because delivery is disabled");
-      return;
+      onNotice("Test failed");
+      onAddActivity(`Test email failed: ${message}`);
     }
-
-    const delivery = createEmailDelivery({
-      createdAt,
-      notificationType: "test_email",
-      provider: settings.providerMode,
-      providerMessageId,
-      recipient,
-      status: settings.providerMode === "console" ? "rendered" : "sent"
-    });
-    onDelivery(delivery);
-    onNotice(settings.providerMode === "console" ? "Rendered locally" : "Test queued");
-    onAddActivity(
-      settings.providerMode === "console" ? `Rendered test email for ${recipient}` : `Queued test email for ${recipient}`
-    );
   };
 
   const apiKeyConfigured = settings.providerMode === "resend" ? "Missing in demo" : "Not required";
