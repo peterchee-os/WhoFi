@@ -1213,6 +1213,7 @@ function UsageView({
         : snapshotHistory.filter((entry) => entry.source === historySourceFilter),
     [historySourceFilter, snapshotHistory]
   );
+  const snapshotHistoryCounts = useMemo(() => getSnapshotHistoryCounts(snapshotHistory), [snapshotHistory]);
 
   return (
     <section className="content-grid usage-layout">
@@ -1248,6 +1249,7 @@ function UsageView({
         <SnapshotHistoryPanel
           entries={filteredSnapshotHistory}
           filter={historySourceFilter}
+          filterCounts={snapshotHistoryCounts}
           onClear={onClearSnapshotHistory}
           onFilterChange={setHistorySourceFilter}
           onLoadCapture={onLoadSnapshotCapture}
@@ -1427,6 +1429,7 @@ function SnapshotCapturePanel({
 function SnapshotHistoryPanel({
   entries,
   filter,
+  filterCounts,
   onClear,
   onFilterChange,
   onLoadCapture,
@@ -1436,6 +1439,7 @@ function SnapshotHistoryPanel({
 }: {
   entries: SnapshotHistoryEntry[];
   filter: SnapshotHistorySourceFilter;
+  filterCounts: Record<SnapshotHistorySourceFilter, number>;
   onClear: () => void;
   onFilterChange: (filter: SnapshotHistorySourceFilter) => void;
   onLoadCapture: (entryId: string) => void;
@@ -1466,7 +1470,8 @@ function SnapshotHistoryPanel({
             onClick={() => onFilterChange(source)}
             type="button"
           >
-            {source === "all" ? "All" : formatDeviceSourceLabel(source)}
+            <span>{source === "all" ? "All" : formatDeviceSourceLabel(source)}</span>
+            <strong>{filterCounts[source]}</strong>
           </button>
         ))}
       </div>
@@ -2711,6 +2716,22 @@ function mergeSnapshotHistory(...entrySets: SnapshotHistoryEntry[][]) {
       seen.add(key);
       return true;
     });
+}
+
+function getSnapshotHistoryCounts(entries: SnapshotHistoryEntry[]): Record<SnapshotHistorySourceFilter, number> {
+  return entries.reduce(
+    (counts, entry) => ({
+      ...counts,
+      all: counts.all + 1,
+      [entry.source]: counts[entry.source] + 1
+    }),
+    {
+      all: 0,
+      demo: 0,
+      omada: 0,
+      "omada-pp": 0
+    }
+  );
 }
 
 function formatHistoryDelta(delta: number) {

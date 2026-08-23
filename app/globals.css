@@ -858,6 +858,10 @@ textarea {
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .source-filter button:last-child {
@@ -867,6 +871,17 @@ textarea {
 .source-filter button.active {
   background: #f0f7f5;
   color: var(--teal-dark);
+}
+
+.source-filter strong {
+  min-width: 20px;
+  min-height: 20px;
+  border-radius: 999px;
+  background: var(--panel-strong);
+  color: var(--teal-dark);
+  display: inline-grid;
+  place-items: center;
+  font-size: 11px;
 }
 
 .source-filter button:focus-visible {
