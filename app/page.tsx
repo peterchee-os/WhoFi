@@ -1424,8 +1424,9 @@ function SnapshotCapturePanel({
           </p>
         </div>
         <div className="panel-actions">
-          <button className="icon-button compact" disabled={!capture} onClick={onExport} title="Export capture" type="button">
+          <button className="text-button slim" disabled={!capture} onClick={onExport} title="Export selected capture JSON" type="button">
             <Download size={16} />
+            Export JSON
           </button>
           <button className="text-button slim" disabled={!capture} onClick={onDelete} type="button">
             Delete
