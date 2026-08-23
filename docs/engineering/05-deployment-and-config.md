@@ -1,0 +1,173 @@
+# Deployment And Config
+
+Date: 2026-08-23
+
+## Decision
+
+WhoFi supports local/demo mode, but it is architected as a hosted/self-hosted operational app.
+
+## Local / Demo Mode
+
+Purpose:
+
+- development
+- GWA/conference demos
+- trying the product without external services
+- very small operator evaluation
+
+Expected flow:
+
+```text
+docker compose up
+-> localhost dashboard
+-> demo provider data
+-> fake devices, guests, companies, events, and alerts
+```
+
+Local demo must not require real Omada, Yardi, or coworking-system credentials.
+
+## Production Mode
+
+Purpose:
+
+- scheduled polling
+- historical storage
+- alerts
+- optional captive portal
+- multi-location operations
+
+Components:
+
+```text
+web app
++ API
++ worker/scheduler
++ database
++ provider connectors
++ alert delivery
++ optional collector
+```
+
+Production can be deployed to:
+
+- small VPS
+- Fly.io
+- Render
+- Railway
+- container host
+- private server
+
+## Collector Mode
+
+Use when a WiFi controller is only reachable from inside the coworking LAN.
+
+```text
+WhoFi Collector
+  -> talks to local controller
+  -> normalizes observations
+  -> pushes observations to hosted WhoFi API
+```
+
+This avoids exposing local controllers publicly.
+
+## Config Model
+
+Use environment variables plus a YAML/JSON config file.
+
+Example:
+
+```yaml
+app:
+  public_url: "https://wifi.example-coworking.com"
+  operator_name: "Example Coworking"
+
+network_providers:
+  - id: "omada-main"
+    type: "omada"
+    display_name: "Main Omada"
+    config:
+      base_url: "${OMADA_BASE_URL}"
+      controller_id: "${OMADA_CONTROLLER_ID}"
+      username: "${OMADA_USERNAME}"
+      password: "${OMADA_PASSWORD}"
+
+identity_providers:
+  - id: "yardi"
+    type: "yardi_kube"
+    display_name: "Yardi Kube"
+    config:
+      base_url: "${YARDI_KUBE_BASE_URL}"
+      api_key: "${YARDI_KUBE_API_KEY}"
+
+locations:
+  - id: "main"
+    name: "Main Location"
+    network_site_ref: "omada:site-id"
+    external_property_ref: "yardi:property-id"
+
+profile_policy:
+  unknown_retention_days: 90
+  event_guest_retention_days: 90
+  drop_in_retention_days: 365
+  max_guest_devices: 2
+
+automation_policy:
+  label_unknown_ai: false
+  require_identity_evidence_for_known_agent: true
+  enable_dns_signals: false
+  enable_flow_signals: false
+  enable_radius_identity: false
+
+agent_identity:
+  heartbeat_enabled: false
+  certificate_identity_enabled: false
+  default_label_without_evidence: "automation_like"
+```
+
+## Public Repo Files
+
+Required:
+
+```text
+.env.example
+config.example.yaml
+docs/
+examples/
+fixtures/anonymized/
+SECURITY.md
+```
+
+Required `.gitignore` entries:
+
+```text
+.env
+.env.*
+!/.env.example
+config/*.local.yaml
+config/thinkspace*.yaml
+secrets/
+*.pem
+*.key
+*.p12
+*.mobileconfig
+```
+
+## Thinkspace Deployment Pattern
+
+Preferred:
+
+```text
+WhoFi public repo
+  -> reusable core
+  -> generic connectors
+  -> demo fixtures
+
+WhoFi Thinkspace private deployment
+  -> pins WhoFi version
+  -> real credentials
+  -> real location mappings
+  -> private C3Scan/Supabase adapter if needed
+  -> production schedules and alerts
+```
+
+Avoid long-lived private fork divergence unless there is no better option.

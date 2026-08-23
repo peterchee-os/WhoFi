@@ -1,0 +1,102 @@
+# WhoFi
+
+Who is on the WiFi?
+
+WhoFi is an open-source WiFi identity ledger for coworking spaces, hackathons, events, and guest networks. It helps operators understand which devices are on the network, who they likely belong to, which company/event/team/profile they map to, and how much bandwidth they consume.
+
+The project is intentionally not a Fortune 100 NAC platform. It starts with visibility, progressive identity, and useful alerts before adding enforcement.
+
+WhoFi should distinguish between:
+
+- `known_agent`: a registered machine/agent host with explicit identity evidence
+- `automation_like`: a device whose network behavior looks scripted, bursty, or unusual
+- `needs_review`: a device where the signal is not strong enough to classify
+
+WiFi counters alone should not be treated as proof that a device is running AI.
+
+## Core Idea
+
+```text
+network observations
+-> device ledger
+-> progressive profiles
+-> optional coworking/property-system links
+-> bandwidth and anomaly visibility
+-> optional captive portal or enforcement
+```
+
+## Intended Users
+
+- coworking operators
+- flexible office operators
+- event/hackathon hosts
+- hackathon organizers
+- meetup and workshop organizers
+- IT teams managing Omada/UniFi/Meraki-style WiFi
+- vendors that want to integrate Deskworks, OfficeRnD, Coworks, Yardi, Nexudus, Cobot, Spacebring, or similar systems
+
+## Deployment Modes
+
+WhoFi should support:
+
+- local/demo mode for development, conference demos, and very small operators
+- hosted/self-hosted production mode with a persistent database, scheduled collectors, alerts, and optional captive portal
+- optional collector mode for networks where the WiFi controller is only reachable from inside the coworking LAN
+
+## Repository Principle
+
+This repo must be safe to publish.
+
+Do not commit:
+
+- API keys
+- OAuth client secrets
+- WiFi controller credentials
+- real MAC addresses
+- real customer/member/person data
+- real internal IP addresses
+- private deployment config
+
+Real deployments should inject secrets through environment variables or a private deployment overlay.
+
+## Engineering Docs
+
+Start here:
+
+- [Engineering Overview](docs/engineering/README.md)
+- [Product Principles](docs/engineering/01-product-principles.md)
+- [System Architecture](docs/engineering/02-system-architecture.md)
+- [Data Model](docs/engineering/03-data-model.md)
+- [Provider Connectors](docs/engineering/04-provider-connectors.md)
+- [Deployment And Config](docs/engineering/05-deployment-and-config.md)
+- [Security And Privacy](docs/engineering/06-security-and-privacy.md)
+- [MVP Roadmap](docs/engineering/07-mvp-roadmap.md)
+- [Prior Art And Competitive Open Source](docs/engineering/08-prior-art.md)
+- [Automation And AI-Like Usage Detection](docs/engineering/09-automation-and-ai-detection.md)
+
+## Keywords
+
+```text
+wifi identity
+guest wifi
+captive portal
+coworking wifi
+hackathon wifi
+event wifi
+drop-in wifi
+device ledger
+bandwidth tracking
+burst detection
+automation detection
+bot detection
+AI agent tracking
+agent identity
+machine identity
+progressive identity
+Omada
+UniFi
+Yardi
+OfficeRnD
+Deskworks
+Coworks
+```
