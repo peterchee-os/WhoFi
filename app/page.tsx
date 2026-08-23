@@ -20,13 +20,21 @@ import {
 import { StatusBadge } from "@/components/StatusBadge";
 import { demoAlerts, demoDevices, demoProfiles } from "@/lib/demo-data";
 import { formatBytes, formatRelativeTime, percent } from "@/lib/format";
-import type { Device, DeviceStatus, Profile, RiskState } from "@/lib/types";
+import type { Alert, AlertStatus, Device, DeviceStatus, Profile, RiskState } from "@/lib/types";
 
 type View = "dashboard" | "devices" | "profiles" | "alerts";
 type ReviewState = {
+  activity: ActivityEntry[];
+  alertStatusOverrides: Record<string, AlertStatus>;
   profileOverrides: Record<string, string | undefined>;
   riskOverrides: Record<string, RiskState>;
   statusOverrides: Record<string, DeviceStatus>;
+};
+
+type ActivityEntry = {
+  id: string;
+  message: string;
+  timestamp: string;
 };
 
 const navItems: Array<{ id: View; label: string; icon: LucideIcon }> = [
@@ -36,7 +44,6 @@ const navItems: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: "alerts", label: "Alerts", icon: AlertTriangle }
 ];
 
-const openAlerts = demoAlerts.filter((alert) => alert.status === "open").length;
 const reviewStateKey = "whofi.demo.reviewState";
 
 const profileById = new Map(demoProfiles.map((profile) => [profile.id, profile]));
@@ -73,6 +80,8 @@ export default function Home() {
   const [profileOverrides, setProfileOverrides] = useState<Record<string, string | undefined>>({});
   const [statusOverrides, setStatusOverrides] = useState<Record<string, DeviceStatus>>({});
   const [riskOverrides, setRiskOverrides] = useState<Record<string, RiskState>>({});
+  const [alertStatusOverrides, setAlertStatusOverrides] = useState<Record<string, AlertStatus>>({});
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [notice, setNotice] = useState("Ready");
 
@@ -81,12 +90,22 @@ export default function Home() {
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as Partial<ReviewState>;
+        setActivity(parsed.activity ?? []);
+        setAlertStatusOverrides(parsed.alertStatusOverrides ?? {});
         setProfileOverrides(parsed.profileOverrides ?? {});
         setRiskOverrides(parsed.riskOverrides ?? {});
         setStatusOverrides(parsed.statusOverrides ?? {});
       } catch {
         window.localStorage.removeItem(reviewStateKey);
       }
+    } else {
+      setActivity([
+        {
+          id: "initial",
+          message: "Demo snapshot loaded",
+          timestamp: new Date().toISOString()
+        }
+      ]);
     }
     setStateLoaded(true);
   }, []);
@@ -95,12 +114,14 @@ export default function Home() {
     if (!stateLoaded) return;
 
     const nextState: ReviewState = {
+      activity,
+      alertStatusOverrides,
       profileOverrides,
       riskOverrides,
       statusOverrides
     };
     window.localStorage.setItem(reviewStateKey, JSON.stringify(nextState));
-  }, [profileOverrides, riskOverrides, stateLoaded, statusOverrides]);
+  }, [activity, alertStatusOverrides, profileOverrides, riskOverrides, stateLoaded, statusOverrides]);
 
   useEffect(() => {
     if (!notice || notice === "Ready") return;
@@ -118,7 +139,14 @@ export default function Home() {
     }));
   }, [profileOverrides, riskOverrides, statusOverrides]);
 
-  const metrics = useMemo(() => getMetrics(devices), [devices]);
+  const alerts = useMemo(() => {
+    return demoAlerts.map((alert) => ({
+      ...alert,
+      status: alertStatusOverrides[alert.id] ?? alert.status
+    }));
+  }, [alertStatusOverrides]);
+
+  const metrics = useMemo(() => getMetrics(devices, alerts), [alerts, devices]);
   const maxUsage = useMemo(() => Math.max(...devices.map((device) => device.rxBytes + device.txBytes)), [devices]);
 
   const filteredDevices = useMemo(() => {
@@ -147,23 +175,43 @@ export default function Home() {
   const selectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? devices[0];
 
   const assignDevice = (deviceId: string, profileId: string) => {
+    const profile = profileById.get(profileId);
     setProfileOverrides((current) => ({ ...current, [deviceId]: profileId }));
     setStatusOverrides((current) => ({ ...current, [deviceId]: "claimed" }));
     setNotice("Owner assigned");
+    addActivity(setActivity, `Assigned ${getDeviceLabel(deviceId)} to ${profile?.displayName ?? "owner"}`);
   };
 
   const setDeviceRisk = (deviceId: string, riskState: RiskState) => {
     setRiskOverrides((current) => ({ ...current, [deviceId]: riskState }));
     setNotice(riskState === "normal" ? "Marked reviewed" : "Device updated");
+    addActivity(setActivity, `${getDeviceLabel(deviceId)} marked ${riskState}`);
   };
 
   const blockDevice = (deviceId: string) => {
     setStatusOverrides((current) => ({ ...current, [deviceId]: "revoked" }));
     setRiskOverrides((current) => ({ ...current, [deviceId]: "needs_review" }));
     setNotice("Device blocked");
+    addActivity(setActivity, `${getDeviceLabel(deviceId)} blocked`);
+  };
+
+  const setAlertStatus = (alertId: string, status: AlertStatus) => {
+    const alert = demoAlerts.find((candidate) => candidate.id === alertId);
+    setAlertStatusOverrides((current) => ({ ...current, [alertId]: status }));
+    setNotice(status === "resolved" ? "Alert resolved" : "Alert acknowledged");
+    addActivity(setActivity, `${status === "resolved" ? "Resolved" : "Acknowledged"} alert: ${alert?.title ?? alertId}`);
   };
 
   const resetDemoState = () => {
+    const initialActivity = [
+      {
+        id: crypto.randomUUID(),
+        message: "Demo state reset",
+        timestamp: new Date().toISOString()
+      }
+    ];
+    setActivity(initialActivity);
+    setAlertStatusOverrides({});
     setProfileOverrides({});
     setRiskOverrides({});
     setStatusOverrides({});
@@ -173,11 +221,14 @@ export default function Home() {
 
   const exportSnapshot = () => {
     const payload = {
-      alerts: demoAlerts,
+      activity,
+      alerts,
       devices,
       exportedAt: new Date().toISOString(),
       profiles: demoProfiles,
       reviewState: {
+        activity,
+        alertStatusOverrides,
         profileOverrides,
         riskOverrides,
         statusOverrides
@@ -264,6 +315,9 @@ export default function Home() {
             onBlockDevice={blockDevice}
             onSelectDevice={setSelectedDeviceId}
             onSetDeviceRisk={setDeviceRisk}
+            onSetAlertStatus={setAlertStatus}
+            activity={activity}
+            alerts={alerts}
             selectedDevice={selectedDevice}
             selectedDeviceId={selectedDeviceId}
           />
@@ -280,22 +334,23 @@ export default function Home() {
           />
         ) : null}
         {activeView === "profiles" ? <ProfilesView profiles={demoProfiles} /> : null}
-        {activeView === "alerts" ? <AlertsView /> : null}
+        {activeView === "alerts" ? <AlertsView alerts={alerts} onSetAlertStatus={setAlertStatus} /> : null}
       </section>
     </main>
   );
 }
 
-function getMetrics(devices: Device[]) {
+function getMetrics(devices: Device[], alerts: Alert[]) {
   const totalBytes = devices.reduce((sum, device) => sum + device.rxBytes + device.txBytes, 0);
   const unknownDevices = devices.filter((device) => device.status === "unknown").length;
-  const reviewSignals = devices.filter((device) =>
+  const deviceSignals = devices.filter((device) =>
     ["automation_like", "possible_bot", "needs_review", "watch"].includes(device.riskState)
   ).length;
+  const openAlertCount = alerts.filter((alert) => alert.status === "open").length;
 
   return {
     onlineDevices: devices.length,
-    reviewSignals,
+    reviewSignals: deviceSignals + openAlertCount,
     totalBytes,
     unknownDevices
   };
@@ -325,20 +380,26 @@ function Metrics({ metrics }: { metrics: ReturnType<typeof getMetrics> }) {
 }
 
 function DashboardView({
+  activity,
+  alerts,
   devices,
   maxUsage,
   onAssignDevice,
   onBlockDevice,
   onSelectDevice,
+  onSetAlertStatus,
   onSetDeviceRisk,
   selectedDevice,
   selectedDeviceId
 }: {
+  activity: ActivityEntry[];
+  alerts: Alert[];
   devices: Device[];
   maxUsage: number;
   onAssignDevice: (deviceId: string, profileId: string) => void;
   onBlockDevice: (deviceId: string) => void;
   onSelectDevice: (deviceId: string) => void;
+  onSetAlertStatus: (alertId: string, status: AlertStatus) => void;
   onSetDeviceRisk: (deviceId: string, riskState: RiskState) => void;
   selectedDevice: Device;
   selectedDeviceId: string;
@@ -361,7 +422,8 @@ function DashboardView({
           onSetDeviceRisk={onSetDeviceRisk}
         />
         <OwnerMix />
-        <AlertQueue limit={3} />
+        <AlertQueue alerts={alerts} limit={3} onSetAlertStatus={onSetAlertStatus} />
+        <ActivityLog activity={activity} />
       </div>
     </section>
   );
@@ -428,8 +490,14 @@ function ProfilesView({ profiles }: { profiles: Profile[] }) {
   );
 }
 
-function AlertsView() {
-  return <AlertQueue />;
+function AlertsView({
+  alerts,
+  onSetAlertStatus
+}: {
+  alerts: Alert[];
+  onSetAlertStatus: (alertId: string, status: AlertStatus) => void;
+}) {
+  return <AlertQueue alerts={alerts} onSetAlertStatus={onSetAlertStatus} />;
 }
 
 function DeviceLedger({
@@ -657,30 +725,86 @@ function OwnerMix() {
   );
 }
 
-function AlertQueue({ limit }: { limit?: number }) {
-  const alerts = limit ? demoAlerts.slice(0, limit) : demoAlerts;
+function AlertQueue({
+  alerts,
+  limit,
+  onSetAlertStatus
+}: {
+  alerts: Alert[];
+  limit?: number;
+  onSetAlertStatus: (alertId: string, status: AlertStatus) => void;
+}) {
+  const shownAlerts = limit ? alerts.slice(0, limit) : alerts;
+  const openAlertCount = alerts.filter((alert) => alert.status === "open").length;
 
   return (
     <section className="panel">
       <div className="panel-header">
         <div>
           <h3>Alert Queue</h3>
-          <p>{openAlerts} open items.</p>
+          <p>{openAlertCount} open items.</p>
         </div>
         <Activity size={20} color="var(--amber)" />
       </div>
       <div className="list">
-        {alerts.map((alert) => (
+        {shownAlerts.map((alert) => (
           <div className="list-item" key={alert.id}>
             <div className="list-title">
               <strong>{alert.title}</strong>
               <StatusBadge state={alert.label} />
             </div>
             <p>{alert.details}</p>
-            <p>{alert.status} · {formatRelativeTime(alert.openedAt)}</p>
+            <div className="inline-actions">
+              <span>{alert.status} · {formatRelativeTime(alert.openedAt)}</span>
+              {alert.status !== "acknowledged" ? (
+                <button onClick={() => onSetAlertStatus(alert.id, "acknowledged")}>Acknowledge</button>
+              ) : null}
+              {alert.status !== "resolved" ? <button onClick={() => onSetAlertStatus(alert.id, "resolved")}>Resolve</button> : null}
+            </div>
           </div>
         ))}
       </div>
     </section>
   );
+}
+
+function ActivityLog({ activity }: { activity: ActivityEntry[] }) {
+  const shownActivity = activity.slice(0, 5);
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <h3>Activity</h3>
+          <p>Recent review work.</p>
+        </div>
+        <Check size={20} color="var(--green)" />
+      </div>
+      <div className="list">
+        {shownActivity.map((entry) => (
+          <div className="list-item compact-item" key={entry.id}>
+            <div className="list-title">
+              <strong>{entry.message}</strong>
+            </div>
+            <p>{formatRelativeTime(entry.timestamp)}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function addActivity(setActivity: (updater: (current: ActivityEntry[]) => ActivityEntry[]) => void, message: string) {
+  setActivity((current) => [
+    {
+      id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`,
+      message,
+      timestamp: new Date().toISOString()
+    },
+    ...current
+  ]);
+}
+
+function getDeviceLabel(deviceId: string) {
+  return demoDevices.find((device) => device.id === deviceId)?.hostname ?? "Device";
 }

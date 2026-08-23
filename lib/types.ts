@@ -23,6 +23,7 @@ export type DeviceStatus =
 export type RiskState = "normal" | "watch" | "automation_like" | "possible_bot" | "known_agent" | "needs_review";
 
 export type AlertSeverity = "info" | "watch" | "warning" | "critical";
+export type AlertStatus = "open" | "acknowledged" | "resolved";
 
 export type Profile = {
   id: string;
@@ -60,7 +61,7 @@ export type Alert = {
   deviceId: string;
   title: string;
   severity: AlertSeverity;
-  status: "open" | "acknowledged" | "resolved";
+  status: AlertStatus;
   label: RiskState;
   details: string;
   openedAt: string;
