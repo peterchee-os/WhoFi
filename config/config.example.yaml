@@ -1,0 +1,28 @@
+app:
+  public_url: "http://localhost:3000"
+  operator_name: "Example Coworking"
+  mode: "demo"
+
+network_providers:
+  - id: "demo-network"
+    type: "demo"
+    display_name: "Demo Network"
+    config: {}
+
+identity_providers:
+  - id: "demo-identity"
+    type: "demo"
+    display_name: "Demo Identity"
+    config: {}
+
+automation_policy:
+  label_unknown_ai: false
+  require_identity_evidence_for_known_agent: true
+  enable_dns_signals: false
+  enable_flow_signals: false
+  enable_radius_identity: false
+
+agent_identity:
+  heartbeat_enabled: false
+  certificate_identity_enabled: false
+  default_label_without_evidence: "automation_like"

@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+.next/
+node_modules/
+out/
+dist/
+coverage/
+config/*.local.yaml
+config/thinkspace*.yaml
+secrets/
+*.pem
+*.key
+*.p12
+*.mobileconfig
+*.log
+.DS_Store
