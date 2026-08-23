@@ -74,6 +74,16 @@ type IntegrationTestState = {
   testedAt?: string;
 };
 
+type CsvPreviewState = {
+  status: "idle" | "previewing" | "success" | "error";
+  message: string;
+  summary?: {
+    companies: number;
+    entitlements: number;
+    people: number;
+  };
+};
+
 type ReviewState = {
   activity: ActivityEntry[];
   alertStatusOverrides: Record<string, AlertStatus>;
@@ -897,6 +907,7 @@ function SettingsView({
 
       <div className="side-stack">
         <IntegrationCards onAddActivity={onAddActivity} onNotice={onNotice} />
+        <CsvImportPreview onAddActivity={onAddActivity} onNotice={onNotice} />
 
         <section className="panel">
           <div className="panel-header">
@@ -1130,6 +1141,80 @@ function formatIntegrationStatus(status: IntegrationCatalogItem["status"]) {
   if (status === "demo") return "demo";
   if (status === "shape_ready") return "shape ready";
   return "planned";
+}
+
+function CsvImportPreview({
+  onAddActivity,
+  onNotice
+}: {
+  onAddActivity: (message: string) => void;
+  onNotice: (notice: string) => void;
+}) {
+  const [input, setInput] = useState("name,email,company,profile_type,status\nExample Guest,guest@example.test,Example Team,guest,registered");
+  const [preview, setPreview] = useState<CsvPreviewState>({
+    message: "Not previewed",
+    status: "idle"
+  });
+
+  const runPreview = async () => {
+    setPreview({
+      message: "Previewing",
+      status: "previewing"
+    });
+
+    try {
+      const response = await fetch("/api/profiles/csv/preview", {
+        body: JSON.stringify({ input }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? `HTTP ${response.status}`);
+
+      setPreview({
+        message: `${payload.summary.people} people, ${payload.summary.companies} companies`,
+        status: "success",
+        summary: payload.summary
+      });
+      onNotice("Roster previewed");
+      onAddActivity(`CSV preview parsed ${payload.summary.people} people and ${payload.summary.companies} companies`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Preview failed";
+      setPreview({
+        message,
+        status: "error"
+      });
+      onNotice("Preview failed");
+      onAddActivity(`CSV preview failed: ${message}`);
+    }
+  };
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <h3>Import Preview</h3>
+          <p>Paste a roster before syncing.</p>
+        </div>
+        <UserPlus size={20} color="var(--green)" />
+      </div>
+      <div className="import-preview">
+        <label className="select-field">
+          <span>CSV or TSV</span>
+          <textarea value={input} onChange={(event) => setInput(event.target.value)} />
+        </label>
+        <div className="integration-title">
+          <span className={`integration-state ${preview.status === "previewing" ? "testing" : preview.status}`}>{preview.message}</span>
+        </div>
+        <button className="text-button" onClick={runPreview} title="Preview import">
+          <Eye size={17} />
+          Preview
+        </button>
+      </div>
+    </section>
+  );
 }
 
 function DeviceLedger({
