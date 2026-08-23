@@ -90,8 +90,7 @@ select {
 
 .nav-item,
 .icon-button,
-.text-button,
-.segmented button {
+.text-button {
   border: 0;
   cursor: default;
 }
@@ -154,28 +153,6 @@ select {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-.segmented {
-  display: flex;
-  background: #e8ece8;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 3px;
-}
-
-.segmented button {
-  min-height: 34px;
-  padding: 0 12px;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-}
-
-.segmented button.active {
-  background: #ffffff;
-  color: var(--ink);
-  box-shadow: 0 1px 4px rgba(29, 36, 40, 0.08);
 }
 
 .icon-button,

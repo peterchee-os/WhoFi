@@ -125,7 +125,7 @@ provider sync
 
 Yardi Kube is an initial provider, but the interface should also support Deskworks, OfficeRnD, Coworks, Nexudus, Cobot, Spacebring, and CSV/manual imports.
 
-Hackathon/event mode should work even when no coworking/property platform exists. In that mode, the identity provider may simply be:
+Hackathon/event context should work even when no coworking/property platform exists. In that case, the identity provider may simply be:
 
 - event roster CSV
 - registration export

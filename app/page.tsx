@@ -5,7 +5,6 @@ import {
   Building2,
   Download,
   Gauge,
-  RadioTower,
   RefreshCcw,
   Search,
   ShieldCheck,
@@ -67,14 +66,9 @@ export default function Home() {
         <header className="topbar">
           <div>
             <h2>WiFi Identity Ledger</h2>
-            <p>Coworking, hackathon, event, and guest network visibility.</p>
+            <p>Devices, owners, guests, members, agents, bandwidth, and review signals.</p>
           </div>
           <div className="toolbar">
-            <div className="segmented" aria-label="Mode">
-              <button className="active">Event</button>
-              <button>Coworking</button>
-              <button>Home</button>
-            </div>
             <button className="icon-button" title="Search">
               <Search size={18} />
             </button>
@@ -178,7 +172,7 @@ export default function Home() {
               <div className="panel-header">
                 <div>
                   <h3>Event Context</h3>
-                  <p>Hackathon roster and team metadata.</p>
+                  <p>Optional context attached to device/profile evidence.</p>
                 </div>
                 <Building2 size={20} color="var(--teal-dark)" />
               </div>

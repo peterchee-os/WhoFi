@@ -86,7 +86,7 @@ Overlap:
 Difference:
 
 - UniFi/AuthentiK-focused
-- no progressive coworking/home/event model
+- no progressive owner/context model spanning members, guests, events, homes, and companies
 
 ### `trinityvoxel/cohostr-wifi-portal`
 
@@ -222,7 +222,7 @@ There is plenty of open-source prior art for:
 I have not found a mature open-source repo that combines:
 
 ```text
-home + coworking + event guest profiles
+guest, member, staff, company, home visitor, event, and hackathon profiles
 + hackathon attendee/team context
 + WiFi client/bandwidth ledger
 + progressive identity
@@ -231,4 +231,4 @@ home + coworking + event guest profiles
 + agent host tracking
 ```
 
-So the opportunity is not "invent captive portals." The opportunity is packaging the right combination for coworking/home/event operators with a lighter, clearer product than enterprise NAC.
+So the opportunity is not "invent captive portals." The opportunity is packaging the right combination for operators who need to understand devices, owners, guest/member context, event context, and bandwidth with a lighter, clearer product than enterprise NAC.

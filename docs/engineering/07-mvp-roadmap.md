@@ -145,7 +145,7 @@ Strengthen device-to-profile binding on selected SSIDs.
 
 Deliverables:
 
-- portal UI modes:
+- portal identity flows:
   - quick guest
   - event/hackathon
   - drop-in/day-pass

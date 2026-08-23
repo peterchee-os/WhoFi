@@ -2,7 +2,7 @@
 
 Who is on the WiFi?
 
-WhoFi is an open-source WiFi identity ledger for coworking spaces, hackathons, events, and guest networks. It helps operators understand which devices are on the network, who they likely belong to, which company/event/team/profile they map to, and how much bandwidth they consume.
+WhoFi is an open-source WiFi identity ledger for coworking spaces, hackathons, events, and guest networks. It helps operators understand which devices are on the network, who they likely belong to, whether they are a guest, registered member, staff device, company device, or known agent host, and how much bandwidth they consume.
 
 The project is intentionally not a Fortune 100 NAC platform. It starts with visibility, progressive identity, and useful alerts before adding enforcement.
 
@@ -20,6 +20,7 @@ WiFi counters alone should not be treated as proof that a device is running AI.
 network observations
 -> device ledger
 -> progressive profiles
+-> guest/member/staff/company/agent context
 -> optional coworking/property-system links
 -> bandwidth and anomaly visibility
 -> optional captive portal or enforcement

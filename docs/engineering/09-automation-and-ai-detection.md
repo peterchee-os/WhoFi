@@ -471,7 +471,7 @@ Optional flow/DNS integrations must be explicit:
 - visible to operators
 - no packet payload capture
 
-For home users, keep the default very simple:
+For simple guest-network deployments, keep the default very simple:
 
 ```text
 guest/device/bandwidth/burst visibility
