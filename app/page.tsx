@@ -39,6 +39,7 @@ import type { Alert, AlertStatus, Device, DeviceStatus, Profile, RiskState } fro
 
 type View = "dashboard" | "devices" | "usage" | "profiles" | "alerts" | "settings";
 type DeviceSnapshotSource = "demo" | "omada" | "omada-pp";
+type SnapshotHistorySourceFilter = "all" | DeviceSnapshotSource;
 type NotificationProviderMode = "disabled" | "console" | "resend";
 type EmailDeliveryStatus = "sent" | "failed" | "disabled" | "rendered";
 type NotificationRuleKey =
@@ -1203,7 +1204,15 @@ function UsageView({
   snapshotCaptureState: IntegrationTestState;
   snapshotHistory: SnapshotHistoryEntry[];
 }) {
+  const [historySourceFilter, setHistorySourceFilter] = useState<SnapshotHistorySourceFilter>("all");
   const maxRollupBytes = Math.max(0, ...sessionSnapshot.rollups.map((rollup) => rollup.totalBytes));
+  const filteredSnapshotHistory = useMemo(
+    () =>
+      historySourceFilter === "all"
+        ? snapshotHistory
+        : snapshotHistory.filter((entry) => entry.source === historySourceFilter),
+    [historySourceFilter, snapshotHistory]
+  );
 
   return (
     <section className="content-grid usage-layout">
@@ -1237,11 +1246,14 @@ function UsageView({
         </div>
 
         <SnapshotHistoryPanel
-          entries={snapshotHistory}
+          entries={filteredSnapshotHistory}
+          filter={historySourceFilter}
           onClear={onClearSnapshotHistory}
+          onFilterChange={setHistorySourceFilter}
           onLoadCapture={onLoadSnapshotCapture}
           persistedEntryIds={persistedSnapshotCaptureIds}
           selectedEntryId={selectedSnapshotCaptureId}
+          totalCount={snapshotHistory.length}
         />
       </div>
 
@@ -1414,33 +1426,52 @@ function SnapshotCapturePanel({
 
 function SnapshotHistoryPanel({
   entries,
+  filter,
   onClear,
+  onFilterChange,
   onLoadCapture,
   persistedEntryIds,
-  selectedEntryId
+  selectedEntryId,
+  totalCount
 }: {
   entries: SnapshotHistoryEntry[];
+  filter: SnapshotHistorySourceFilter;
   onClear: () => void;
+  onFilterChange: (filter: SnapshotHistorySourceFilter) => void;
   onLoadCapture: (entryId: string) => void;
   persistedEntryIds: string[];
   selectedEntryId: string;
+  totalCount: number;
 }) {
   const visibleEntries = entries.slice(0, 8);
   const persistedEntryIdSet = new Set(persistedEntryIds);
+  const sourceFilters: SnapshotHistorySourceFilter[] = ["all", "demo", "omada", "omada-pp"];
 
   return (
     <div className="panel">
       <div className="panel-header">
         <div>
           <h3>Snapshot History</h3>
-          <p>{visibleEntries.length} recent captures.</p>
+          <p>{visibleEntries.length} of {totalCount} recent captures.</p>
         </div>
-        <button className="text-button slim" disabled={entries.length === 0} onClick={onClear}>
+        <button className="text-button slim" disabled={totalCount === 0} onClick={onClear}>
           Clear
         </button>
       </div>
+      <div className="source-filter" aria-label="Snapshot source filter">
+        {sourceFilters.map((source) => (
+          <button
+            className={filter === source ? "active" : ""}
+            key={source}
+            onClick={() => onFilterChange(source)}
+            type="button"
+          >
+            {source === "all" ? "All" : formatDeviceSourceLabel(source)}
+          </button>
+        ))}
+      </div>
       <div className="list">
-        {visibleEntries.map((entry, index) => {
+        {visibleEntries.length ? visibleEntries.map((entry, index) => {
           const previous = entries[index + 1];
           const delta = previous ? entry.totalBytes - previous.totalBytes : 0;
           const persisted = persistedEntryIdSet.has(entry.id);
@@ -1467,7 +1498,11 @@ function SnapshotHistoryPanel({
               <p>{persisted ? "Stored capture" : "Local only"} · <RelativeTime value={entry.observedAt} /></p>
             </button>
           );
-        })}
+        }) : (
+          <div className="list-item compact-item">
+            <p>No captures for this source.</p>
+          </div>
+        )}
       </div>
     </div>
   );

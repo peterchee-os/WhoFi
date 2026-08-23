@@ -840,6 +840,40 @@ textarea {
   outline-offset: -2px;
 }
 
+.source-filter {
+  margin: 0 18px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.source-filter button {
+  min-height: 34px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.source-filter button:last-child {
+  border-right: 0;
+}
+
+.source-filter button.active {
+  background: #f0f7f5;
+  color: var(--teal-dark);
+}
+
+.source-filter button:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: -2px;
+}
+
 .detail-body {
   padding: 16px 18px 18px;
   display: grid;
