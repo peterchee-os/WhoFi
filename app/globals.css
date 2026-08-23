@@ -514,6 +514,50 @@ textarea {
   font-size: 13px;
 }
 
+.evidence-box {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  padding: 12px;
+  display: grid;
+  gap: 9px;
+}
+
+.evidence-box ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.confidence-pill {
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.confidence-pill.none,
+.confidence-pill.low {
+  background: #fee2e2;
+  color: var(--red);
+}
+
+.confidence-pill.medium {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.confidence-pill.high {
+  background: #e7f5ec;
+  color: var(--green);
+}
+
 .select-field {
   display: grid;
   gap: 7px;

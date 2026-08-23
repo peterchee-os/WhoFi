@@ -84,6 +84,34 @@ Responsibilities:
 9. Staff or user claims/links profile when appropriate.
 ```
 
+## Resolution Layer
+
+Device ownership should be represented as evidence, not a blind assertion.
+
+Initial implementation state:
+
+- demo resolver lives at `lib/resolution.ts`
+- demo route lives at `/api/resolution/demo`
+- dashboard and device inspector show confidence score, confidence label, and evidence
+
+Resolution inputs:
+
+- network observation/device state
+- explicit profile assignment
+- profile type and profile level
+- hostname hints
+- private MAC signal
+- automation-like behavior signal
+
+Resolution outputs:
+
+- assigned profile id, when known
+- confidence score and label
+- evidence list
+- `needsReview` boolean
+
+This is intentionally lightweight. Production resolution can later incorporate stronger evidence such as captive portal claims, verified email/phone, member-system entitlements, RADIUS/certificate identity, agent heartbeat, and staff review history.
+
 ## Agent / Machine Identity Flow
 
 Known AI agents, build machines, crawlers, workflow bots, and other automation hosts should be modeled as explicit machine identities.

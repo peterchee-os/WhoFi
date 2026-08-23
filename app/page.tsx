@@ -25,6 +25,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { demoAlerts, demoDevices, demoProfiles } from "@/lib/demo-data";
 import { formatBytes, formatRelativeTime, percent } from "@/lib/format";
 import { integrationCatalog, type IntegrationCatalogItem } from "@/lib/integrations/catalog";
+import { resolveDevices, type DeviceResolution } from "@/lib/resolution";
 import type { Alert, AlertStatus, Device, DeviceStatus, Profile, RiskState } from "@/lib/types";
 
 type View = "dashboard" | "devices" | "profiles" | "alerts" | "settings";
@@ -296,6 +297,11 @@ export default function Home() {
 
   const metrics = useMemo(() => getMetrics(devices, alerts), [alerts, devices]);
   const maxUsage = useMemo(() => Math.max(...devices.map((device) => device.rxBytes + device.txBytes)), [devices]);
+  const resolutions = useMemo(() => resolveDevices(devices, demoProfiles), [devices]);
+  const resolutionByDeviceId = useMemo(
+    () => new Map(resolutions.map((resolution) => [resolution.deviceId, resolution])),
+    [resolutions]
+  );
 
   const filteredDevices = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -472,6 +478,7 @@ export default function Home() {
             onSetAlertStatus={setAlertStatus}
             activity={activity}
             alerts={alerts}
+            resolutionByDeviceId={resolutionByDeviceId}
             selectedDevice={selectedDevice}
             selectedDeviceId={selectedDeviceId}
           />
@@ -484,6 +491,7 @@ export default function Home() {
             onBlockDevice={blockDevice}
             onSelectDevice={setSelectedDeviceId}
             onSetDeviceRisk={setDeviceRisk}
+            resolutionByDeviceId={resolutionByDeviceId}
             selectedDeviceId={selectedDeviceId}
           />
         ) : null}
@@ -559,6 +567,7 @@ function DashboardView({
   onSelectDevice,
   onSetAlertStatus,
   onSetDeviceRisk,
+  resolutionByDeviceId,
   selectedDevice,
   selectedDeviceId
 }: {
@@ -571,6 +580,7 @@ function DashboardView({
   onSelectDevice: (deviceId: string) => void;
   onSetAlertStatus: (alertId: string, status: AlertStatus) => void;
   onSetDeviceRisk: (deviceId: string, riskState: RiskState) => void;
+  resolutionByDeviceId: Map<string, DeviceResolution>;
   selectedDevice: Device;
   selectedDeviceId: string;
 }) {
@@ -581,6 +591,7 @@ function DashboardView({
         compact
         maxUsage={maxUsage}
         onSelectDevice={onSelectDevice}
+        resolutionByDeviceId={resolutionByDeviceId}
         selectedDeviceId={selectedDeviceId}
       />
 
@@ -590,6 +601,7 @@ function DashboardView({
           onAssignDevice={onAssignDevice}
           onBlockDevice={onBlockDevice}
           onSetDeviceRisk={onSetDeviceRisk}
+          resolution={resolutionByDeviceId.get(selectedDevice.id)}
         />
         <OwnerMix />
         <AlertQueue alerts={alerts} limit={3} onSetAlertStatus={onSetAlertStatus} />
@@ -606,6 +618,7 @@ function DevicesView({
   onBlockDevice,
   onSelectDevice,
   onSetDeviceRisk,
+  resolutionByDeviceId,
   selectedDeviceId
 }: {
   devices: Device[];
@@ -614,13 +627,20 @@ function DevicesView({
   onBlockDevice: (deviceId: string) => void;
   onSelectDevice: (deviceId: string) => void;
   onSetDeviceRisk: (deviceId: string, riskState: RiskState) => void;
+  resolutionByDeviceId: Map<string, DeviceResolution>;
   selectedDeviceId: string;
 }) {
   const selectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? devices[0];
 
   return (
     <section className="content-grid detail-layout">
-      <DeviceLedger devices={devices} maxUsage={maxUsage} onSelectDevice={onSelectDevice} selectedDeviceId={selectedDeviceId} />
+      <DeviceLedger
+        devices={devices}
+        maxUsage={maxUsage}
+        onSelectDevice={onSelectDevice}
+        resolutionByDeviceId={resolutionByDeviceId}
+        selectedDeviceId={selectedDeviceId}
+      />
       <div className="side-stack">
         {selectedDevice ? (
           <DeviceInspector
@@ -628,6 +648,7 @@ function DevicesView({
             onAssignDevice={onAssignDevice}
             onBlockDevice={onBlockDevice}
             onSetDeviceRisk={onSetDeviceRisk}
+            resolution={resolutionByDeviceId.get(selectedDevice.id)}
           />
         ) : (
           <EmptyPanel />
@@ -1099,12 +1120,14 @@ function DeviceLedger({
   compact = false,
   maxUsage,
   onSelectDevice,
+  resolutionByDeviceId,
   selectedDeviceId
 }: {
   devices: Device[];
   compact?: boolean;
   maxUsage: number;
   onSelectDevice: (deviceId: string) => void;
+  resolutionByDeviceId: Map<string, DeviceResolution>;
   selectedDeviceId: string;
 }) {
   const shownDevices = compact ? devices.slice(0, 6) : devices;
@@ -1140,6 +1163,7 @@ function DeviceLedger({
         <tbody>
           {shownDevices.map((device) => {
             const profile = device.profileId ? profileById.get(device.profileId) : undefined;
+            const resolution = resolutionByDeviceId.get(device.id);
             const usage = device.rxBytes + device.txBytes;
 
             return (
@@ -1153,7 +1177,10 @@ function DeviceLedger({
                 <td>
                   <div className="device-name">
                     <strong>{profile?.displayName ?? "Unclaimed"}</strong>
-                    <span>{profile?.organizationName ?? "No profile yet"}</span>
+                    <span>
+                      {profile?.organizationName ?? "No profile yet"}
+                      {resolution ? ` · ${resolution.confidence} ${resolution.confidenceScore}%` : ""}
+                    </span>
                   </div>
                 </td>
                 <td>
@@ -1195,12 +1222,14 @@ function DeviceInspector({
   device,
   onAssignDevice,
   onBlockDevice,
-  onSetDeviceRisk
+  onSetDeviceRisk,
+  resolution
 }: {
   device: Device;
   onAssignDevice: (deviceId: string, profileId: string) => void;
   onBlockDevice: (deviceId: string) => void;
   onSetDeviceRisk: (deviceId: string, riskState: RiskState) => void;
+  resolution?: DeviceResolution;
 }) {
   const [selectedProfileId, setSelectedProfileId] = useState(device.profileId ?? demoProfiles[0].id);
   const profile = device.profileId ? profileById.get(device.profileId) : undefined;
@@ -1225,6 +1254,20 @@ function DeviceInspector({
           <strong>{profile?.displayName ?? "Unclaimed"}</strong>
           <span>{profile?.organizationName ?? "No owner assigned"}</span>
         </div>
+
+        {resolution ? (
+          <div className="evidence-box">
+            <div className="list-title">
+              <strong>Resolution</strong>
+              <span className={`confidence-pill ${resolution.confidence}`}>{resolution.confidence} {resolution.confidenceScore}%</span>
+            </div>
+            <ul>
+              {resolution.evidence.map((item) => (
+                <li key={`${item.type}-${item.label}`}>{item.label}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <label className="select-field">
           <span>Owner</span>
