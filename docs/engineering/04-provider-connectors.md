@@ -102,11 +102,11 @@ interface NetworkProvider {
 Initial provider:
 
 - Omada
+- Cisco Meraki for Redmond
 
 Future providers:
 
 - UniFi
-- Cisco Meraki
 - Aruba/Ruckus via API or CSV
 - generic CSV
 - demo provider
@@ -161,6 +161,43 @@ Open spike questions:
 - whether counters are cumulative or per-session
 - whether cloud and hardware controller APIs differ enough to require subtypes
 - how to handle rate limits and sessions
+
+## Cisco Meraki Connector
+
+Meraki should be an exact network module because Redmond uses Cisco Meraki gear.
+
+Public Cisco Dashboard API notes:
+
+- Meraki provides a Dashboard API for cloud-managed network monitoring and management.
+- `GET /networks/{networkId}/clients` lists clients seen on a network for a timespan.
+- The client list includes MAC, IP, description/user, SSID, status, recent connected device, and sent/received usage.
+- Cisco documents that this client data is updated at most once every five minutes.
+
+Responsibilities:
+
+- authenticate using an operator-scoped Meraki Dashboard API key or OAuth/bearer credential
+- list organizations and networks during setup
+- list clients for the selected Redmond/network scope
+- collect MAC, IP, SSID, recent device/AP, online/offline status, and usage counters
+- normalize usage into WhoFi `rxBytes` and `txBytes`
+- keep API keys write-only in the admin UI
+- handle pagination from Meraki response link headers
+
+Expected admin configuration:
+
+- organization id
+- network id
+- API key or bearer credential, write-only
+- enable/disable toggle
+- test connection
+- last test result/error/timestamp
+
+Current implementation state:
+
+- exact normalizer module exists at `lib/providers/meraki.ts`
+- demo-safe shape endpoint exists at `/api/observations/meraki/shape`
+- Settings integration card can test the normalized output shape
+- no live Meraki API client, credentials, or production sync yet
 
 ## Yardi Kube Connector
 

@@ -1,4 +1,4 @@
-export type NetworkProviderType = "demo" | "omada";
+export type NetworkProviderType = "demo" | "omada" | "meraki";
 
 export type NetworkProviderConfig = {
   id: string;
@@ -28,4 +28,3 @@ export type NetworkProvider = {
   readonly config: NetworkProviderConfig;
   listObservations(): Promise<NetworkObservation[]>;
 };
-

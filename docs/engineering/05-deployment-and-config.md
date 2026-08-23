@@ -90,6 +90,13 @@ network_providers:
       controller_id: "${OMADA_CONTROLLER_ID}"
       username: "${OMADA_USERNAME}"
       password: "${OMADA_PASSWORD}"
+  - id: "meraki-redmond"
+    type: "meraki"
+    display_name: "Redmond Meraki"
+    config:
+      organization_id: "${MERAKI_ORGANIZATION_ID}"
+      network_id: "${MERAKI_NETWORK_ID}"
+      api_key: "${MERAKI_API_KEY}"
 
 identity_providers:
   - id: "yardi"
@@ -152,6 +159,7 @@ config loader
   -> identity/officernd module
   -> identity/yardi module
   -> network/omada module
+  -> network/meraki module
 ```
 
 Avoid:

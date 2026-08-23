@@ -28,6 +28,14 @@ export const integrationCatalog: IntegrationCatalogItem[] = [
     status: "planned"
   },
   {
+    category: "Network",
+    description: "Cloud-managed clients and usage data",
+    id: "network-meraki",
+    name: "Cisco Meraki",
+    status: "shape_ready",
+    testPath: "/api/observations/meraki/shape"
+  },
+  {
     category: "Identity",
     description: "Demo profile snapshot endpoint",
     id: "identity-demo",
