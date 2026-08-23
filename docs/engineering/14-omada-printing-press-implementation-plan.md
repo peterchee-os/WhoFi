@@ -158,7 +158,8 @@ Status:
 - Private CLI redaction was tightened for token-shaped strings, MAC addresses, and IP addresses, with a unit test included in the saved reapply patch.
 - Private CLI now includes `whofi doctor` and `whofi doctor --live`; live doctor checks config, base URL parsing, login, and active-client endpoint readiness without emitting observations.
 - Private smoke script `smoke-omada-pp.sh` runs missing-config, offline doctor, live doctor, and sanitized live observation summary. Active-client counts are live telemetry and should be expected to fluctuate.
-- Additional negative-path cases still need to be scripted: bad site id and no network/timeout.
+- Bad-site-id live negative path is scripted and fails cleanly at the active-client endpoint without emitting observations.
+- Additional negative-path case still needed: no network/timeout.
 
 ## Phase 5: Decide Runtime Integration
 
