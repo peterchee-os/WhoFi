@@ -66,6 +66,12 @@ type EmailDelivery = {
   createdAt: string;
 };
 
+type IntegrationTestState = {
+  status: "idle" | "testing" | "success" | "error";
+  message: string;
+  testedAt?: string;
+};
+
 type ReviewState = {
   activity: ActivityEntry[];
   alertStatusOverrides: Record<string, AlertStatus>;
@@ -868,6 +874,8 @@ function SettingsView({
       </div>
 
       <div className="side-stack">
+        <IntegrationCards onAddActivity={onAddActivity} onNotice={onNotice} />
+
         <section className="panel">
           <div className="panel-header">
             <div>
@@ -979,6 +987,137 @@ function SettingsView({
           </table>
         </div>
       </section>
+    </section>
+  );
+}
+
+function IntegrationCards({
+  onAddActivity,
+  onNotice
+}: {
+  onAddActivity: (message: string) => void;
+  onNotice: (notice: string) => void;
+}) {
+  const [results, setResults] = useState<Record<string, IntegrationTestState>>({});
+
+  const integrations = [
+    {
+      category: "Network",
+      description: "Demo observations endpoint",
+      id: "network-demo",
+      name: "Demo Network",
+      testPath: "/api/observations/demo"
+    },
+    {
+      category: "Network",
+      description: "Controller client and usage data",
+      id: "network-omada",
+      name: "Omada"
+    },
+    {
+      category: "Identity",
+      description: "Demo profile snapshot endpoint",
+      id: "identity-demo",
+      name: "Demo Identity",
+      testPath: "/api/profiles/demo"
+    },
+    {
+      category: "Identity",
+      description: "Property/customer entitlement source",
+      id: "identity-yardi",
+      name: "Yardi"
+    },
+    {
+      category: "Identity",
+      description: "Coworking member and company source",
+      id: "identity-officernd",
+      name: "OfficeRnD"
+    }
+  ];
+
+  const testIntegration = async (integration: typeof integrations[number]) => {
+    setResults((current) => ({
+      ...current,
+      [integration.id]: {
+        message: "Testing",
+        status: "testing"
+      }
+    }));
+
+    if (!integration.testPath) {
+      const result = {
+        message: "Not configured",
+        status: "error" as const,
+        testedAt: new Date().toISOString()
+      };
+      setResults((current) => ({ ...current, [integration.id]: result }));
+      onNotice("Not configured");
+      onAddActivity(`${integration.name} test skipped: not configured`);
+      return;
+    }
+
+    try {
+      const response = await fetch(integration.testPath);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const payload = await response.json();
+      const count = Array.isArray(payload.observations)
+        ? payload.observations.length
+        : Array.isArray(payload.snapshot?.people)
+          ? payload.snapshot.people.length
+          : 0;
+      const result = {
+        message: `${count} records`,
+        status: "success" as const,
+        testedAt: new Date().toISOString()
+      };
+      setResults((current) => ({ ...current, [integration.id]: result }));
+      onNotice("Integration tested");
+      onAddActivity(`${integration.name} test returned ${count} records`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Request failed";
+      setResults((current) => ({
+        ...current,
+        [integration.id]: {
+          message,
+          status: "error",
+          testedAt: new Date().toISOString()
+        }
+      }));
+      onNotice("Test failed");
+      onAddActivity(`${integration.name} test failed: ${message}`);
+    }
+  };
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <h3>Integrations</h3>
+          <p>Exact provider modules.</p>
+        </div>
+        <Wifi size={20} color="var(--teal-dark)" />
+      </div>
+      <div className="integration-list">
+        {integrations.map((integration) => {
+          const result = results[integration.id] ?? { message: "Not tested", status: "idle" as const };
+          return (
+            <div className="integration-item" key={integration.id}>
+              <div className="integration-title">
+                <div>
+                  <strong>{integration.name}</strong>
+                  <span>{integration.category} · {integration.description}</span>
+                </div>
+                <span className={`integration-state ${result.status}`}>{result.message}</span>
+              </div>
+              <button className="text-button" onClick={() => testIntegration(integration)} title={`Test ${integration.name}`}>
+                <Check size={17} />
+                Test
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }
