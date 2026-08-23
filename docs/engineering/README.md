@@ -52,6 +52,7 @@ Identity provider
 9. [Automation And AI-Like Usage Detection](09-automation-and-ai-detection.md)
 10. [Notifications](10-notifications.md)
 11. [Current Handoff](11-current-handoff.md)
+12. [Printing Press Omada Spike](12-printing-press-omada-spike.md)
 
 ## Implementation Artifacts
 
