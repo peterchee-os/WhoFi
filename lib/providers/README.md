@@ -21,9 +21,12 @@ Current providers:
 
 ```text
 GET /api/observations/demo
+GET /api/devices?source=demo
 ```
 
 Returns normalized observations generated from local demo data.
+
+The device endpoint returns WhoFi device rows built from the selected source. It defaults to `source=demo`.
 
 ## Shape Endpoints
 
@@ -50,3 +53,19 @@ The Omada test endpoint uses server-side Omada credentials and Essentials contro
 The Omada CLI test endpoint runs an optional Printing Press generated CLI when `OMADA_PP_CLI_PATH` is configured. It is for private deployment smoke tests and connector comparison. The generated CLI is not vendored into the public WhoFi repo.
 
 The Omada compare endpoint calls both the TypeScript connector and the optional Printing Press CLI bridge, then returns counts and match status only. It intentionally does not return observations, MACs, IPs, names, or raw controller payloads.
+
+## Device Snapshot Endpoint
+
+```text
+GET /api/devices?source=demo
+GET /api/devices?source=omada
+GET /api/devices?source=omada-pp
+```
+
+Returns WhoFi `Device` rows from a selected observation source:
+
+- `demo`: public-safe fixture devices
+- `omada`: TypeScript Omada connector
+- `omada-pp`: optional Printing Press CLI bridge
+
+This endpoint is the public API boundary the dashboard should use before real database persistence exists. Live sources return MAC/IP/host fields from the configured controller, so production deployments should protect this endpoint behind normal app authentication before exposing real tenant networks.
