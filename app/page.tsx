@@ -29,6 +29,7 @@ import { resolveDevices, type DeviceResolution } from "@/lib/resolution";
 import type { Alert, AlertStatus, Device, DeviceStatus, Profile, RiskState } from "@/lib/types";
 
 type View = "dashboard" | "devices" | "profiles" | "alerts" | "settings";
+type DeviceSnapshotSource = "demo" | "omada" | "omada-pp";
 type NotificationProviderMode = "disabled" | "console" | "resend";
 type EmailDeliveryStatus = "sent" | "failed" | "disabled" | "rendered";
 type NotificationRuleKey =
@@ -115,6 +116,12 @@ const navItems: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: "profiles", label: "Profiles", icon: Users },
   { id: "alerts", label: "Alerts", icon: AlertTriangle },
   { id: "settings", label: "Settings", icon: Settings }
+];
+
+const deviceSourceOptions: Array<{ id: DeviceSnapshotSource; label: string }> = [
+  { id: "demo", label: "Demo" },
+  { id: "omada", label: "Omada" },
+  { id: "omada-pp", label: "Omada CLI" }
 ];
 
 const reviewStateKey = "whofi.demo.reviewState";
@@ -230,6 +237,12 @@ export default function Home() {
   const [activeView, setActiveView] = useState<View>("dashboard");
   const [query, setQuery] = useState("");
   const [selectedDeviceId, setSelectedDeviceId] = useState("dev-unknown-burst");
+  const [deviceSnapshotSource, setDeviceSnapshotSource] = useState<DeviceSnapshotSource>("demo");
+  const [sourceDevices, setSourceDevices] = useState<Device[]>(demoDevices);
+  const [sourceState, setSourceState] = useState<IntegrationTestState>({
+    message: "Demo",
+    status: "success"
+  });
   const [notificationSettings, setNotificationSettings] = useState(defaultNotificationSettings);
   const [emailDeliveries, setEmailDeliveries] = useState(seededEmailDeliveries);
   const [profileOverrides, setProfileOverrides] = useState<Record<string, string | undefined>>({});
@@ -299,13 +312,13 @@ export default function Home() {
   }, [notice]);
 
   const devices = useMemo(() => {
-    return demoDevices.map((device) => ({
+    return sourceDevices.map((device) => ({
       ...device,
       profileId: profileOverrides[device.id] ?? device.profileId,
       status: statusOverrides[device.id] ?? device.status,
       riskState: riskOverrides[device.id] ?? device.riskState
     }));
-  }, [profileOverrides, riskOverrides, statusOverrides]);
+  }, [profileOverrides, riskOverrides, sourceDevices, statusOverrides]);
 
   const alerts = useMemo(() => {
     return demoAlerts.map((alert) => ({
@@ -315,7 +328,7 @@ export default function Home() {
   }, [alertStatusOverrides]);
 
   const metrics = useMemo(() => getMetrics(devices, alerts), [alerts, devices]);
-  const maxUsage = useMemo(() => Math.max(...devices.map((device) => device.rxBytes + device.txBytes)), [devices]);
+  const maxUsage = useMemo(() => Math.max(0, ...devices.map((device) => device.rxBytes + device.txBytes)), [devices]);
   const resolutions = useMemo(() => resolveDevices(devices, demoProfiles), [devices]);
   const resolutionByDeviceId = useMemo(
     () => new Map(resolutions.map((resolution) => [resolution.deviceId, resolution])),
@@ -347,25 +360,78 @@ export default function Home() {
   const title = viewTitles[activeView];
   const selectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? devices[0];
 
+  const loadDeviceSource = async (source: DeviceSnapshotSource) => {
+    setSourceState({
+      message: "Loading",
+      status: "testing"
+    });
+
+    if (source === "demo") {
+      setDeviceSnapshotSource("demo");
+      setSourceDevices(demoDevices);
+      setSelectedDeviceId("dev-unknown-burst");
+      setSourceState({
+        message: "Demo",
+        status: "success",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Demo snapshot loaded");
+      addActivity(setActivity, "Loaded demo device snapshot");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/devices?source=${source}`);
+      const payload = (await response.json()) as {
+        devices?: Device[];
+        error?: string;
+        source?: DeviceSnapshotSource;
+      };
+      if (!response.ok || !Array.isArray(payload.devices)) {
+        throw new Error(payload.error ?? "Device source failed");
+      }
+
+      setDeviceSnapshotSource(source);
+      setSourceDevices(payload.devices);
+      setSelectedDeviceId(payload.devices[0]?.id ?? "");
+      setSourceState({
+        message: `${payload.devices.length} devices`,
+        status: "success",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Snapshot loaded");
+      addActivity(setActivity, `Loaded ${formatDeviceSourceLabel(source)} device snapshot (${payload.devices.length} devices)`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Device source failed";
+      setSourceState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Snapshot load failed");
+      addActivity(setActivity, `${formatDeviceSourceLabel(source)} device snapshot failed: ${message}`);
+    }
+  };
+
   const assignDevice = (deviceId: string, profileId: string) => {
     const profile = profileById.get(profileId);
     setProfileOverrides((current) => ({ ...current, [deviceId]: profileId }));
     setStatusOverrides((current) => ({ ...current, [deviceId]: "claimed" }));
     setNotice("Owner assigned");
-    addActivity(setActivity, `Assigned ${getDeviceLabel(deviceId)} to ${profile?.displayName ?? "owner"}`);
+    addActivity(setActivity, `Assigned ${getDeviceLabel(deviceId, devices)} to ${profile?.displayName ?? "owner"}`);
   };
 
   const setDeviceRisk = (deviceId: string, riskState: RiskState) => {
     setRiskOverrides((current) => ({ ...current, [deviceId]: riskState }));
     setNotice(riskState === "normal" ? "Marked reviewed" : "Device updated");
-    addActivity(setActivity, `${getDeviceLabel(deviceId)} marked ${riskState}`);
+    addActivity(setActivity, `${getDeviceLabel(deviceId, devices)} marked ${riskState}`);
   };
 
   const blockDevice = (deviceId: string) => {
     setStatusOverrides((current) => ({ ...current, [deviceId]: "revoked" }));
     setRiskOverrides((current) => ({ ...current, [deviceId]: "needs_review" }));
     setNotice("Device blocked");
-    addActivity(setActivity, `${getDeviceLabel(deviceId)} blocked`);
+    addActivity(setActivity, `${getDeviceLabel(deviceId, devices)} blocked`);
   };
 
   const setAlertStatus = (alertId: string, status: AlertStatus) => {
@@ -390,6 +456,13 @@ export default function Home() {
     setProfileOverrides({});
     setRiskOverrides({});
     setStatusOverrides({});
+    setDeviceSnapshotSource("demo");
+    setSourceDevices(demoDevices);
+    setSourceState({
+      message: "Demo",
+      status: "success"
+    });
+    setSelectedDeviceId("dev-unknown-burst");
     window.localStorage.removeItem(reviewStateKey);
     setNotice("Reset complete");
   };
@@ -399,6 +472,7 @@ export default function Home() {
       activity,
       alerts,
       devices,
+      deviceSnapshotSource,
       exportedAt: new Date().toISOString(),
       notificationSettings,
       emailDeliveries,
@@ -474,6 +548,19 @@ export default function Home() {
               />
             </label>
             <span className="notice-pill">{notice}</span>
+            <div className="source-switch" aria-label="Device source">
+              {deviceSourceOptions.map((source) => (
+                <button
+                  className={deviceSnapshotSource === source.id ? "active" : ""}
+                  key={source.id}
+                  onClick={() => loadDeviceSource(source.id)}
+                  title={`Load ${source.label} devices`}
+                >
+                  {source.label}
+                </button>
+              ))}
+              <span className={`integration-state ${sourceState.status}`}>{sourceState.message}</span>
+            </div>
             <button className="icon-button" onClick={resetDemoState} title="Reset">
               <RefreshCcw size={18} />
             </button>
@@ -1791,6 +1878,12 @@ function addActivity(setActivity: (updater: (current: ActivityEntry[]) => Activi
   ]);
 }
 
-function getDeviceLabel(deviceId: string) {
-  return demoDevices.find((device) => device.id === deviceId)?.hostname ?? "Device";
+function formatDeviceSourceLabel(source: DeviceSnapshotSource) {
+  if (source === "omada") return "Omada";
+  if (source === "omada-pp") return "Omada CLI";
+  return "Demo";
+}
+
+function getDeviceLabel(deviceId: string, devices: Device[] = demoDevices) {
+  return devices.find((device) => device.id === deviceId)?.hostname ?? "Device";
 }

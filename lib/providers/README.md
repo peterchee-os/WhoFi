@@ -71,4 +71,6 @@ Returns WhoFi `Device` rows from a selected observation source:
 - `omada`: TypeScript Omada connector
 - `omada-pp`: optional Printing Press CLI bridge
 
+The dashboard source switcher uses this endpoint to keep demo mode as the default while allowing an operator to explicitly load configured Omada or Omada Printing Press live snapshots.
+
 This endpoint is the public API boundary the dashboard should use before real database persistence exists. Live sources return MAC/IP/host fields from the configured controller, so production deployments should protect this endpoint behind normal app authentication before exposing real tenant networks.
