@@ -132,6 +132,73 @@ textarea {
   padding: 28px;
 }
 
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.auth-panel {
+  width: min(420px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 22px;
+  display: grid;
+  gap: 18px;
+}
+
+.auth-brand .muted {
+  color: var(--muted);
+}
+
+.auth-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--teal-dark);
+  display: grid;
+  place-items: center;
+}
+
+.auth-panel h2 {
+  margin: 0 0 6px;
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.auth-panel p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.auth-field {
+  display: grid;
+  gap: 8px;
+}
+
+.auth-field span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.auth-field input {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  outline: 0;
+}
+
+.auth-button {
+  width: 100%;
+}
+
 .topbar {
   display: flex;
   align-items: flex-start;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -10,6 +10,8 @@ import {
   Eye,
   Gauge,
   KeyRound,
+  Lock,
+  LogOut,
   Mail,
   RefreshCcw,
   Search,
@@ -108,6 +110,13 @@ type LiveSourceAccess = {
   enabled: boolean;
   loaded: boolean;
   tokenRequired: boolean;
+};
+
+type AdminAuthState = {
+  authenticated: boolean;
+  configured: boolean;
+  enabled: boolean;
+  loaded: boolean;
 };
 
 type SnapshotHistoryEntry = {
@@ -275,6 +284,12 @@ export default function Home() {
   const [deviceSnapshotSource, setDeviceSnapshotSource] = useState<DeviceSnapshotSource>("demo");
   const [liveSourceToken, setLiveSourceToken] = useState("");
   const [snapshotObservedAt, setSnapshotObservedAt] = useState(new Date().toISOString());
+  const [adminAuth, setAdminAuth] = useState<AdminAuthState>({
+    authenticated: false,
+    configured: false,
+    enabled: false,
+    loaded: false
+  });
   const [liveSourceAccess, setLiveSourceAccess] = useState<LiveSourceAccess>({
     enabled: false,
     loaded: false,
@@ -362,6 +377,52 @@ export default function Home() {
   useEffect(() => {
     let cancelled = false;
 
+    fetch("/api/auth/admin/status")
+      .then((response) => response.json())
+      .then((payload) => {
+        if (cancelled) return;
+        setAdminAuth({
+          authenticated: Boolean(payload.authenticated),
+          configured: Boolean(payload.configured),
+          enabled: Boolean(payload.enabled),
+          loaded: true
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAdminAuth({
+          authenticated: false,
+          configured: false,
+          enabled: true,
+          loaded: true
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!adminAuth.loaded) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (adminAuth.enabled && !adminAuth.authenticated) {
+      setLiveSourceAccess({
+        enabled: false,
+        loaded: true,
+        tokenRequired: false
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
     fetch("/api/providers/network/status")
       .then((response) => response.json())
       .then((payload) => {
@@ -386,7 +447,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [adminAuth.authenticated, adminAuth.enabled, adminAuth.loaded]);
 
   const devices = useMemo(() => {
     return sourceDevices.map((device) => ({
@@ -579,6 +640,22 @@ export default function Home() {
     setNotice("Reset complete");
   };
 
+  const logoutAdmin = async () => {
+    await fetch("/api/auth/admin/logout", { method: "POST" }).catch(() => undefined);
+    setAdminAuth((current) => ({
+      ...current,
+      authenticated: false,
+      loaded: true
+    }));
+    setLiveSourceAccess({
+      enabled: false,
+      loaded: true,
+      tokenRequired: false
+    });
+    setLiveSourceToken("");
+    setNotice("Signed out");
+  };
+
   const exportSnapshot = () => {
     const payload = {
       activity,
@@ -610,6 +687,23 @@ export default function Home() {
     URL.revokeObjectURL(url);
     setNotice("Snapshot exported");
   };
+
+  if (!adminAuth.loaded) {
+    return <AdminGate status="checking" />;
+  }
+
+  if (adminAuth.enabled && !adminAuth.authenticated) {
+    return (
+      <AdminGate
+        configured={adminAuth.configured}
+        onLogin={(nextAuth) => {
+          setAdminAuth(nextAuth);
+          setNotice("Signed in");
+        }}
+        status="locked"
+      />
+    );
+  }
 
   return (
     <main className="app-shell">
@@ -695,6 +789,11 @@ export default function Home() {
               <Download size={18} />
               Export
             </button>
+            {adminAuth.enabled ? (
+              <button className="icon-button" onClick={logoutAdmin} title="Sign out">
+                <LogOut size={18} />
+              </button>
+            ) : null}
           </div>
         </header>
 
@@ -790,6 +889,106 @@ function Metrics({ metrics }: { metrics: ReturnType<typeof getMetrics> }) {
         <strong>{metrics.reviewSignals}</strong>
       </div>
     </section>
+  );
+}
+
+function AdminGate({
+  configured = true,
+  onLogin,
+  status
+}: {
+  configured?: boolean;
+  onLogin?: (authState: AdminAuthState) => void;
+  status: "checking" | "locked";
+}) {
+  const [password, setPassword] = useState("");
+  const [loginState, setLoginState] = useState<IntegrationTestState>({
+    message: status === "checking" ? "Checking access" : "Admin access required",
+    status: status === "checking" ? "testing" : "idle"
+  });
+
+  useEffect(() => {
+    if (status !== "locked") return;
+    setLoginState((current) => current.status === "testing"
+      ? {
+          message: "Admin access required",
+          status: "idle"
+        }
+      : current);
+  }, [status]);
+
+  const login = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoginState({
+      message: "Signing in",
+      status: "testing"
+    });
+
+    try {
+      const response = await fetch("/api/auth/admin/login", {
+        body: JSON.stringify({ password }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.authenticated) {
+        throw new Error(payload.error ?? "Sign in failed");
+      }
+
+      onLogin?.({
+        authenticated: true,
+        configured: Boolean(payload.configured),
+        enabled: Boolean(payload.enabled),
+        loaded: true
+      });
+    } catch (error) {
+      setLoginState({
+        message: error instanceof Error ? error.message : "Sign in failed",
+        status: "error"
+      });
+    }
+  };
+
+  return (
+    <main className="auth-shell">
+      <form className="auth-panel" onSubmit={login}>
+        <div className="brand auth-brand">
+          <div className="brand-mark">W</div>
+          <div>
+            <h1>WhoFi</h1>
+            <p className="muted">Admin access</p>
+          </div>
+        </div>
+        <div className="auth-icon">
+          <Lock size={24} />
+        </div>
+        <div>
+          <h2>{status === "checking" ? "Checking Access" : "Sign In"}</h2>
+          <p>
+            {configured
+              ? "Enter the admin password for live network operations."
+              : "Admin auth is enabled, but WHOFI_ADMIN_PASSWORD is not configured."}
+          </p>
+        </div>
+        <label className="auth-field">
+          <span>Password</span>
+          <input
+            autoComplete="current-password"
+            disabled={!configured || status === "checking"}
+            onChange={(event) => setPassword(event.target.value)}
+            type="password"
+            value={password}
+          />
+        </label>
+        <button className="text-button auth-button" disabled={!configured || status === "checking" || loginState.status === "testing"}>
+          <KeyRound size={18} />
+          Sign in
+        </button>
+        <span className={`integration-state ${loginState.status}`}>{loginState.message}</span>
+      </form>
+    </main>
   );
 }
 

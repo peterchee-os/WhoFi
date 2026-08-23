@@ -25,6 +25,7 @@ Latest completed slices:
 - live device snapshot gate via `WHOFI_ENABLE_LIVE_DEVICE_SOURCES`
 - optional live source token via `WHOFI_LIVE_DEVICE_SOURCE_TOKEN`
 - `/api/sessions` endpoint with the same source, gate, and token behavior as `/api/devices`
+- optional app-level admin gate via `WHOFI_REQUIRE_ADMIN_AUTH`, `WHOFI_ADMIN_PASSWORD`, and `WHOFI_ADMIN_SESSION_SECRET`
 
 The UI intentionally avoids visible product-mode tabs such as event/coworking/home. The product can support those contexts internally, but the operator experience should stay focused on who and what is on the WiFi.
 
@@ -86,13 +87,12 @@ If port `3000` is already in use, use the next available port and tell Peter the
 Recommended next slice:
 
 ```text
-Add app-level admin authentication before hosted live-network use
+Persist device snapshots, snapshot history, and session rollups server-side
 ```
 
-The demo app now has explicit live-source buttons, and `/api/devices?source=omada` / `source=omada-pp` can return real MAC/IP/hostname data only when `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true`. When `WHOFI_LIVE_DEVICE_SOURCE_TOKEN` is set, live source requests also need `X-WhoFi-Live-Source-Token`. Before exposing a hosted deployment against real tenant WiFi, add:
+The demo app now has explicit live-source buttons, and `/api/devices?source=omada` / `source=omada-pp` can return real MAC/IP/hostname data only when `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true`. When `WHOFI_LIVE_DEVICE_SOURCE_TOKEN` is set, live source requests also need `X-WhoFi-Live-Source-Token`. Hosted deployments should also set `WHOFI_REQUIRE_ADMIN_AUTH=true`.
 
-- app-level admin authentication
-- tenant/operator access control around provider config
+Before multi-tenant or production use, add tenant/operator access control around provider config.
 
 Keep demo mode public-safe. Live source responses include client network identifiers and must not be exposed unauthenticated.
 
@@ -110,8 +110,8 @@ Do not start with:
 
 Next practical order:
 
-1. Add app-level admin authentication.
-2. Persist device snapshots, snapshot history, and session rollups server-side instead of deriving/storing them only in memory or browser localStorage.
+1. Persist device snapshots, snapshot history, and session rollups server-side instead of deriving/storing them only in memory or browser localStorage.
+2. Add tenant/operator access control around provider config.
 3. Demo data cleanup and responsive pass.
 4. Lightweight in-memory/server-side provider interface for notifications.
 5. Settings/Notifications UI polish if needed.

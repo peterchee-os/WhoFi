@@ -5,10 +5,23 @@ import {
   readDeviceSource,
   redactDeviceSourceError
 } from "@/lib/device-snapshots";
+import { getAdminAuthStatus } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
+  const adminStatus = getAdminAuthStatus(request);
+  if (!adminStatus.authenticated) {
+    return NextResponse.json(
+      {
+        error: "Admin authentication required"
+      },
+      {
+        status: adminStatus.configured ? 401 : 503
+      }
+    );
+  }
+
   const source = readDeviceSource(request.nextUrl.searchParams.get("source"));
   const accessError = getLiveSourceAccessError(source, request.headers);
 

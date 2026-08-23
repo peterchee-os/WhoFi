@@ -55,7 +55,9 @@ For personal devices, do not infer application/process identity. A laptop with t
 
 Email notifications should avoid raw MAC addresses in subject lines and should not send guest/customer emails until templates, consent, and recipient rules are explicit.
 
-Live device sources must be explicitly enabled with `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true`. Keep that flag false for public demos and any deployment that does not yet have admin authentication or equivalent operator access control.
+Hosted deployments that can reach live provider data must enable `WHOFI_REQUIRE_ADMIN_AUTH=true`. Demo/local mode can stay open by default, but live-network deployments need an outer admin gate before provider readiness or client snapshots are exposed.
+
+Live device sources must also be explicitly enabled with `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true`. Keep that flag false for public demos and any deployment that does not yet have admin authentication or equivalent operator access control.
 
 If `WHOFI_LIVE_DEVICE_SOURCE_TOKEN` is configured, treat it as a secret. It is a lightweight protection layer for live source requests, not a replacement for proper admin authentication in a hosted multi-operator product.
 
@@ -80,6 +82,13 @@ password: "real-password"
 ## Auth Model
 
 MVP can use simple admin authentication.
+
+Current implementation:
+
+- `WHOFI_REQUIRE_ADMIN_AUTH=true` enables the admin sign-in screen.
+- `WHOFI_ADMIN_PASSWORD` is required when the gate is enabled.
+- `WHOFI_ADMIN_SESSION_SECRET` signs the HTTP-only admin session cookie and should be a random secret.
+- sensitive provider readiness and live observation routes reject requests without the admin session when the gate is enabled.
 
 Longer-term roles:
 

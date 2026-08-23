@@ -46,7 +46,19 @@ WhoFi should support:
 - hosted/self-hosted production mode with a persistent database, scheduled collectors, alerts, and optional captive portal
 - optional collector mode for networks where the WiFi controller is only reachable from inside the coworking LAN
 
-The current demo app includes device review, source switching, notification settings, provider readiness, usage rollups by location/SSID/AP, and browser-local snapshot history.
+The current demo app includes device review, source switching, notification settings, provider readiness, usage rollups by location/SSID/AP, browser-local snapshot history, and optional admin authentication for hosted/live-network use.
+
+## Admin Gate
+
+Demo mode is open by default. Hosted deployments that can reach live WiFi providers should set:
+
+```text
+WHOFI_REQUIRE_ADMIN_AUTH=true
+WHOFI_ADMIN_PASSWORD=...
+WHOFI_ADMIN_SESSION_SECRET=...
+```
+
+When enabled, the app shows an admin sign-in screen before exposing the dashboard. Sensitive provider and live snapshot routes also require the signed admin session. `WHOFI_LIVE_DEVICE_SOURCE_TOKEN` remains a separate per-request live snapshot token, useful for an extra operator-controlled gate around real client data.
 
 ## Repository Principle
 

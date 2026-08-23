@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getAdminAuthStatus } from "@/lib/admin-auth";
 
 type ProviderMode = "disabled" | "console" | "resend";
 type DeliveryStatus = "sent" | "failed" | "disabled" | "rendered";
@@ -24,7 +25,19 @@ type TestNotificationResponse = {
   };
 };
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const adminStatus = getAdminAuthStatus(request);
+  if (!adminStatus.authenticated) {
+    return NextResponse.json(
+      {
+        error: "Admin authentication required"
+      },
+      {
+        status: adminStatus.configured ? 401 : 503
+      }
+    );
+  }
+
   const body = (await request.json().catch(() => ({}))) as TestNotificationRequest;
   const providerMode = body.providerMode ?? "disabled";
   const recipient = body.recipient?.trim() || "none";

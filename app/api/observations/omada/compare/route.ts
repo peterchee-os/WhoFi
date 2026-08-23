@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getAdminAuthStatus } from "@/lib/admin-auth";
 import { getOmadaClientFromEnv, listOmadaObservations } from "@/lib/providers/omada";
 import {
   getOmadaPrintingPressConfigFromEnv,
@@ -7,7 +8,19 @@ import {
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const adminStatus = getAdminAuthStatus(request);
+  if (!adminStatus.authenticated) {
+    return NextResponse.json(
+      {
+        error: "Admin authentication required"
+      },
+      {
+        status: adminStatus.configured ? 401 : 503
+      }
+    );
+  }
+
   const result = {
     cli: await countCliObservations(),
     match: false,

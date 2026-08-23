@@ -185,11 +185,24 @@ Each production integration should have:
 
 Public repo examples can include fake values and `.env.example` entries. Real operator config belongs in private deployment config or deployment secret storage.
 
+## Admin Access
+
+Local demo mode stays open by default. Hosted deployments that can reach live provider data should enable the admin gate:
+
+```text
+WHOFI_REQUIRE_ADMIN_AUTH=true
+WHOFI_ADMIN_PASSWORD=...
+WHOFI_ADMIN_SESSION_SECRET=...
+```
+
+When enabled, WhoFi serves an admin sign-in screen before the dashboard and requires the signed admin session cookie for provider readiness, live observation test routes, notification tests, `/api/devices`, and `/api/sessions`. Use a random `WHOFI_ADMIN_SESSION_SECRET` distinct from the password. If it is omitted, the password signs sessions, which is only acceptable for throwaway local testing.
+
 Current implementation state:
 
 - `GET /api/providers/network/status` reports Omada and Cisco Meraki config readiness from server-side env vars, including whether live snapshots are enabled for Omada rows.
 - `GET /api/observations/omada/cli-doctor` runs the optional Omada Printing Press CLI readiness check and returns only check names/statuses.
 - The dashboard device source switcher keeps demo devices as the default and only loads live Omada or Omada Printing Press snapshots after an explicit operator click.
+- `WHOFI_REQUIRE_ADMIN_AUTH=true` enables app-level admin sign-in before the dashboard and API-level auth checks around live/provider routes.
 - `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true` is required before `/api/devices?source=omada` or `source=omada-pp` returns live network rows. Keep it false for public demos and unauthenticated deployments.
 - `WHOFI_LIVE_DEVICE_SOURCE_TOKEN` adds a lightweight admin token check for live snapshot requests. When set, requests must include `X-WhoFi-Live-Source-Token`.
 - `WHOFI_VERIFICATION_CLIENT_MAC` can configure one known device or AP/BSSID as a live-source smoke-test anchor; set `WHOFI_VERIFICATION_ANCHOR_KIND=client` or `access_point`. API responses report only whether the anchor is present, never the configured MAC value.
