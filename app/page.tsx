@@ -9,8 +9,12 @@ import {
   Download,
   Eye,
   Gauge,
+  KeyRound,
+  Mail,
   RefreshCcw,
   Search,
+  Send,
+  Settings,
   ShieldCheck,
   UserPlus,
   Users,
@@ -22,10 +26,51 @@ import { demoAlerts, demoDevices, demoProfiles } from "@/lib/demo-data";
 import { formatBytes, formatRelativeTime, percent } from "@/lib/format";
 import type { Alert, AlertStatus, Device, DeviceStatus, Profile, RiskState } from "@/lib/types";
 
-type View = "dashboard" | "devices" | "profiles" | "alerts";
+type View = "dashboard" | "devices" | "profiles" | "alerts" | "settings";
+type NotificationProviderMode = "disabled" | "console" | "resend";
+type EmailDeliveryStatus = "sent" | "failed" | "disabled" | "rendered";
+type NotificationRuleKey =
+  | "daily_digest"
+  | "unknown_high_bandwidth"
+  | "automation_like_burst"
+  | "revoked_owner_online"
+  | "known_agent_missing_heartbeat"
+  | "collector_offline";
+
+type NotificationSettings = {
+  providerMode: NotificationProviderMode;
+  fromName: string;
+  fromEmail: string;
+  replyToEmail: string;
+  digestRecipients: string;
+  criticalRecipients: string;
+  batchSettlingMinutes: number;
+  rules: Record<NotificationRuleKey, NotificationRule>;
+};
+
+type NotificationRule = {
+  enabled: boolean;
+  delivery: "digest" | "immediate";
+  recipientGroup: "digest" | "critical";
+  severity: "info" | "watch" | "warning" | "critical";
+};
+
+type EmailDelivery = {
+  id: string;
+  notificationType: string;
+  recipient: string;
+  provider: NotificationProviderMode;
+  status: EmailDeliveryStatus;
+  providerMessageId?: string;
+  error?: string;
+  createdAt: string;
+};
+
 type ReviewState = {
   activity: ActivityEntry[];
   alertStatusOverrides: Record<string, AlertStatus>;
+  emailDeliveries: EmailDelivery[];
+  notificationSettings: NotificationSettings;
   profileOverrides: Record<string, string | undefined>;
   riskOverrides: Record<string, RiskState>;
   statusOverrides: Record<string, DeviceStatus>;
@@ -41,7 +86,8 @@ const navItems: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: "dashboard", label: "Dashboard", icon: Gauge },
   { id: "devices", label: "Devices", icon: Wifi },
   { id: "profiles", label: "Profiles", icon: Users },
-  { id: "alerts", label: "Alerts", icon: AlertTriangle }
+  { id: "alerts", label: "Alerts", icon: AlertTriangle },
+  { id: "settings", label: "Settings", icon: Settings }
 ];
 
 const reviewStateKey = "whofi.demo.reviewState";
@@ -70,13 +116,95 @@ const viewTitles: Record<View, { title: string; subtitle: string }> = {
   alerts: {
     title: "Alerts",
     subtitle: "Open review queue."
+  },
+  settings: {
+    title: "Settings",
+    subtitle: "Operator configuration."
   }
 };
+
+const notificationRuleLabels: Record<NotificationRuleKey, string> = {
+  daily_digest: "Daily digest",
+  unknown_high_bandwidth: "Unknown high bandwidth",
+  automation_like_burst: "Automation-like burst",
+  revoked_owner_online: "Revoked owner online",
+  known_agent_missing_heartbeat: "Agent heartbeat missing",
+  collector_offline: "Collector offline"
+};
+
+const defaultNotificationSettings: NotificationSettings = {
+  providerMode: "console",
+  fromName: "WhoFi",
+  fromEmail: "alerts@example.test",
+  replyToEmail: "ops@example.test",
+  digestRecipients: "ops@example.test",
+  criticalRecipients: "oncall@example.test",
+  batchSettlingMinutes: 30,
+  rules: {
+    daily_digest: {
+      enabled: true,
+      delivery: "digest",
+      recipientGroup: "digest",
+      severity: "info"
+    },
+    unknown_high_bandwidth: {
+      enabled: true,
+      delivery: "immediate",
+      recipientGroup: "critical",
+      severity: "warning"
+    },
+    automation_like_burst: {
+      enabled: true,
+      delivery: "immediate",
+      recipientGroup: "critical",
+      severity: "warning"
+    },
+    revoked_owner_online: {
+      enabled: true,
+      delivery: "immediate",
+      recipientGroup: "critical",
+      severity: "critical"
+    },
+    known_agent_missing_heartbeat: {
+      enabled: true,
+      delivery: "digest",
+      recipientGroup: "critical",
+      severity: "watch"
+    },
+    collector_offline: {
+      enabled: true,
+      delivery: "digest",
+      recipientGroup: "critical",
+      severity: "watch"
+    }
+  }
+};
+
+const seededEmailDeliveries: EmailDelivery[] = [
+  {
+    id: "email-demo-digest",
+    notificationType: "daily_digest",
+    recipient: "ops@example.test",
+    provider: "console",
+    status: "rendered",
+    createdAt: new Date(Date.now() - 44 * 60000).toISOString()
+  },
+  {
+    id: "email-demo-burst",
+    notificationType: "automation_like_burst",
+    recipient: "oncall@example.test",
+    provider: "console",
+    status: "rendered",
+    createdAt: new Date(Date.now() - 12 * 60000).toISOString()
+  }
+];
 
 export default function Home() {
   const [activeView, setActiveView] = useState<View>("dashboard");
   const [query, setQuery] = useState("");
   const [selectedDeviceId, setSelectedDeviceId] = useState("dev-unknown-burst");
+  const [notificationSettings, setNotificationSettings] = useState(defaultNotificationSettings);
+  const [emailDeliveries, setEmailDeliveries] = useState(seededEmailDeliveries);
   const [profileOverrides, setProfileOverrides] = useState<Record<string, string | undefined>>({});
   const [statusOverrides, setStatusOverrides] = useState<Record<string, DeviceStatus>>({});
   const [riskOverrides, setRiskOverrides] = useState<Record<string, RiskState>>({});
@@ -92,6 +220,8 @@ export default function Home() {
         const parsed = JSON.parse(stored) as Partial<ReviewState>;
         setActivity(parsed.activity ?? []);
         setAlertStatusOverrides(parsed.alertStatusOverrides ?? {});
+        setEmailDeliveries(parsed.emailDeliveries ?? seededEmailDeliveries);
+        setNotificationSettings(mergeNotificationSettings(parsed.notificationSettings));
         setProfileOverrides(parsed.profileOverrides ?? {});
         setRiskOverrides(parsed.riskOverrides ?? {});
         setStatusOverrides(parsed.statusOverrides ?? {});
@@ -116,12 +246,23 @@ export default function Home() {
     const nextState: ReviewState = {
       activity,
       alertStatusOverrides,
+      emailDeliveries,
+      notificationSettings,
       profileOverrides,
       riskOverrides,
       statusOverrides
     };
     window.localStorage.setItem(reviewStateKey, JSON.stringify(nextState));
-  }, [activity, alertStatusOverrides, profileOverrides, riskOverrides, stateLoaded, statusOverrides]);
+  }, [
+    activity,
+    alertStatusOverrides,
+    emailDeliveries,
+    notificationSettings,
+    profileOverrides,
+    riskOverrides,
+    stateLoaded,
+    statusOverrides
+  ]);
 
   useEffect(() => {
     if (!notice || notice === "Ready") return;
@@ -212,6 +353,8 @@ export default function Home() {
     ];
     setActivity(initialActivity);
     setAlertStatusOverrides({});
+    setEmailDeliveries(seededEmailDeliveries);
+    setNotificationSettings(defaultNotificationSettings);
     setProfileOverrides({});
     setRiskOverrides({});
     setStatusOverrides({});
@@ -225,10 +368,14 @@ export default function Home() {
       alerts,
       devices,
       exportedAt: new Date().toISOString(),
+      notificationSettings,
+      emailDeliveries,
       profiles: demoProfiles,
       reviewState: {
         activity,
         alertStatusOverrides,
+        emailDeliveries,
+        notificationSettings,
         profileOverrides,
         riskOverrides,
         statusOverrides
@@ -335,6 +482,22 @@ export default function Home() {
         ) : null}
         {activeView === "profiles" ? <ProfilesView profiles={demoProfiles} /> : null}
         {activeView === "alerts" ? <AlertsView alerts={alerts} onSetAlertStatus={setAlertStatus} /> : null}
+        {activeView === "settings" ? (
+          <SettingsView
+            deliveries={emailDeliveries}
+            onAddActivity={(message) => addActivity(setActivity, message)}
+            onDelivery={(delivery) => setEmailDeliveries((current) => [delivery, ...current].slice(0, 12))}
+            onNotice={setNotice}
+            onReset={() => {
+              setNotificationSettings(defaultNotificationSettings);
+              setEmailDeliveries(seededEmailDeliveries);
+              setNotice("Defaults restored");
+              addActivity(setActivity, "Notification settings reset");
+            }}
+            onSettingsChange={setNotificationSettings}
+            settings={notificationSettings}
+          />
+        ) : null}
       </section>
     </main>
   );
@@ -498,6 +661,304 @@ function AlertsView({
   onSetAlertStatus: (alertId: string, status: AlertStatus) => void;
 }) {
   return <AlertQueue alerts={alerts} onSetAlertStatus={onSetAlertStatus} />;
+}
+
+function SettingsView({
+  deliveries,
+  onAddActivity,
+  onDelivery,
+  onNotice,
+  onReset,
+  onSettingsChange,
+  settings
+}: {
+  deliveries: EmailDelivery[];
+  onAddActivity: (message: string) => void;
+  onDelivery: (delivery: EmailDelivery) => void;
+  onNotice: (notice: string) => void;
+  onReset: () => void;
+  onSettingsChange: (settings: NotificationSettings) => void;
+  settings: NotificationSettings;
+}) {
+  const updateSettings = (updates: Partial<NotificationSettings>) => {
+    onSettingsChange({ ...settings, ...updates });
+  };
+
+  const updateRule = (ruleKey: NotificationRuleKey, updates: Partial<NotificationRule>) => {
+    onSettingsChange({
+      ...settings,
+      rules: {
+        ...settings.rules,
+        [ruleKey]: {
+          ...settings.rules[ruleKey],
+          ...updates
+        }
+      }
+    });
+  };
+
+  const sendTestEmail = () => {
+    const recipient = getFirstRecipient(settings.criticalRecipients) ?? getFirstRecipient(settings.digestRecipients);
+    const createdAt = new Date().toISOString();
+    const providerMessageId = settings.providerMode === "resend" ? "demo_resend_pending" : undefined;
+
+    if (!recipient) {
+      const delivery = createEmailDelivery({
+        createdAt,
+        error: "No test recipient configured",
+        notificationType: "test_email",
+        provider: settings.providerMode,
+        recipient: "none",
+        status: "failed"
+      });
+      onDelivery(delivery);
+      onNotice("Recipient missing");
+      onAddActivity("Test email failed: recipient missing");
+      return;
+    }
+
+    if (settings.providerMode === "disabled") {
+      const delivery = createEmailDelivery({
+        createdAt,
+        error: "Email delivery is disabled",
+        notificationType: "test_email",
+        provider: "disabled",
+        recipient,
+        status: "disabled"
+      });
+      onDelivery(delivery);
+      onNotice("Email disabled");
+      onAddActivity("Test email skipped because delivery is disabled");
+      return;
+    }
+
+    const delivery = createEmailDelivery({
+      createdAt,
+      notificationType: "test_email",
+      provider: settings.providerMode,
+      providerMessageId,
+      recipient,
+      status: settings.providerMode === "console" ? "rendered" : "sent"
+    });
+    onDelivery(delivery);
+    onNotice(settings.providerMode === "console" ? "Rendered locally" : "Test queued");
+    onAddActivity(
+      settings.providerMode === "console" ? `Rendered test email for ${recipient}` : `Queued test email for ${recipient}`
+    );
+  };
+
+  const apiKeyConfigured = settings.providerMode === "resend" ? "Missing in demo" : "Not required";
+  const domainStatus = settings.providerMode === "resend" ? "needs_verification" : "not_configured";
+
+  return (
+    <section className="settings-grid">
+      <div className="panel settings-panel">
+        <div className="panel-header">
+          <div>
+            <h3>Email</h3>
+            <p>Provider and sender settings.</p>
+          </div>
+          <Mail size={20} color="var(--teal-dark)" />
+        </div>
+
+        <div className="form-grid">
+          <label className="select-field">
+            <span>Provider</span>
+            <select
+              value={settings.providerMode}
+              onChange={(event) => updateSettings({ providerMode: event.target.value as NotificationProviderMode })}
+            >
+              <option value="disabled">Disabled</option>
+              <option value="console">Console</option>
+              <option value="resend">Resend</option>
+            </select>
+          </label>
+
+          <label className="select-field">
+            <span>Sender name</span>
+            <input
+              onChange={(event) => updateSettings({ fromName: event.target.value })}
+              value={settings.fromName}
+            />
+          </label>
+
+          <label className="select-field">
+            <span>Sender email</span>
+            <input
+              onChange={(event) => updateSettings({ fromEmail: event.target.value })}
+              value={settings.fromEmail}
+            />
+          </label>
+
+          <label className="select-field">
+            <span>Reply-to</span>
+            <input
+              onChange={(event) => updateSettings({ replyToEmail: event.target.value })}
+              value={settings.replyToEmail}
+            />
+          </label>
+
+          <label className="select-field span-2">
+            <span>Digest recipients</span>
+            <textarea
+              onChange={(event) => updateSettings({ digestRecipients: event.target.value })}
+              value={settings.digestRecipients}
+            />
+          </label>
+
+          <label className="select-field span-2">
+            <span>Critical recipients</span>
+            <textarea
+              onChange={(event) => updateSettings({ criticalRecipients: event.target.value })}
+              value={settings.criticalRecipients}
+            />
+          </label>
+
+          <label className="select-field">
+            <span>Batch minutes</span>
+            <input
+              min={5}
+              onChange={(event) => updateSettings({ batchSettlingMinutes: Number(event.target.value) || 30 })}
+              type="number"
+              value={settings.batchSettlingMinutes}
+            />
+          </label>
+        </div>
+
+        <div className="settings-actions">
+          <button className="text-button" onClick={() => {
+            onNotice("Settings saved");
+            onAddActivity("Notification settings saved");
+          }} title="Save settings">
+            <Check size={17} />
+            Save
+          </button>
+          <button className="text-button" onClick={sendTestEmail} title="Send test email">
+            <Send size={17} />
+            Test
+          </button>
+          <button className="text-button danger" onClick={() => updateSettings({ providerMode: "disabled" })} title="Disable email">
+            <Ban size={17} />
+            Disable
+          </button>
+          <button className="icon-button" onClick={onReset} title="Reset notification defaults">
+            <RefreshCcw size={17} />
+          </button>
+        </div>
+      </div>
+
+      <div className="side-stack">
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <h3>Status</h3>
+              <p>Secrets stay server-side.</p>
+            </div>
+            <KeyRound size={20} color="var(--blue)" />
+          </div>
+          <dl className="kv-list status-list">
+            <div>
+              <dt>Provider</dt>
+              <dd>{settings.providerMode}</dd>
+            </div>
+            <div>
+              <dt>API key</dt>
+              <dd>{apiKeyConfigured}</dd>
+            </div>
+            <div>
+              <dt>Domain</dt>
+              <dd>{domainStatus}</dd>
+            </div>
+            <div>
+              <dt>Last send</dt>
+              <dd>{deliveries[0] ? formatRelativeTime(deliveries[0].createdAt) : "none"}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <h3>Rules</h3>
+              <p>Alert delivery controls.</p>
+            </div>
+            <AlertTriangle size={20} color="var(--amber)" />
+          </div>
+          <div className="rule-list">
+            {(Object.keys(notificationRuleLabels) as NotificationRuleKey[]).map((ruleKey) => {
+              const rule = settings.rules[ruleKey];
+              return (
+                <div className="rule-item" key={ruleKey}>
+                  <label className="toggle-row">
+                    <input
+                      checked={rule.enabled}
+                      onChange={(event) => updateRule(ruleKey, { enabled: event.target.checked })}
+                      type="checkbox"
+                    />
+                    <strong>{notificationRuleLabels[ruleKey]}</strong>
+                  </label>
+                  <div className="rule-controls">
+                    <select
+                      aria-label={`${notificationRuleLabels[ruleKey]} severity`}
+                      value={rule.severity}
+                      onChange={(event) => updateRule(ruleKey, { severity: event.target.value as NotificationRule["severity"] })}
+                    >
+                      <option value="info">Info</option>
+                      <option value="watch">Watch</option>
+                      <option value="warning">Warning</option>
+                      <option value="critical">Critical</option>
+                    </select>
+                    <select
+                      aria-label={`${notificationRuleLabels[ruleKey]} delivery`}
+                      value={rule.delivery}
+                      onChange={(event) => updateRule(ruleKey, { delivery: event.target.value as NotificationRule["delivery"] })}
+                    >
+                      <option value="digest">Digest</option>
+                      <option value="immediate">Immediate</option>
+                    </select>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+
+      <section className="panel span-full">
+        <div className="panel-header">
+          <div>
+            <h3>Delivery Log</h3>
+            <p>{deliveries.length} recent attempts.</p>
+          </div>
+          <Activity size={20} color="var(--green)" />
+        </div>
+        <table className="device-table delivery-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Type</th>
+              <th>Recipient</th>
+              <th>Provider</th>
+              <th>Status</th>
+              <th>Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            {deliveries.map((delivery) => (
+              <tr key={delivery.id}>
+                <td>{formatRelativeTime(delivery.createdAt)}</td>
+                <td>{delivery.notificationType}</td>
+                <td>{delivery.recipient}</td>
+                <td>{delivery.provider}</td>
+                <td><span className={`delivery-status ${delivery.status}`}>{delivery.status}</span></td>
+                <td>{delivery.error ?? delivery.providerMessageId ?? "ok"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </section>
+  );
 }
 
 function DeviceLedger({
@@ -792,6 +1253,47 @@ function ActivityLog({ activity }: { activity: ActivityEntry[] }) {
       </div>
     </section>
   );
+}
+
+function mergeNotificationSettings(settings?: Partial<NotificationSettings>) {
+  if (!settings) return defaultNotificationSettings;
+
+  return {
+    ...defaultNotificationSettings,
+    ...settings,
+    rules: {
+      ...defaultNotificationSettings.rules,
+      ...(settings.rules ?? {})
+    }
+  };
+}
+
+function getFirstRecipient(recipients: string) {
+  return recipients
+    .split(/[\n,]/)
+    .map((recipient) => recipient.trim())
+    .filter(Boolean)[0];
+}
+
+function createEmailDelivery({
+  createdAt,
+  error,
+  notificationType,
+  provider,
+  providerMessageId,
+  recipient,
+  status
+}: Omit<EmailDelivery, "id">) {
+  return {
+    createdAt,
+    error,
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`,
+    notificationType,
+    provider,
+    providerMessageId,
+    recipient,
+    status
+  };
 }
 
 function addActivity(setActivity: (updater: (current: ActivityEntry[]) => ActivityEntry[]) => void, message: string) {
