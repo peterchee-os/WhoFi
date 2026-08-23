@@ -39,11 +39,13 @@ A focused read-only spec for the WhoFi path generated and built a Go CLI skeleto
 - MCP server scaffold
 - local config/data/cache/state paths
 
+The private generated CLI was then hand-patched with a `whofi observations` command that performs the Omada web-console session flow and emits normalized WhoFi observations. A private live read-only smoke test against an Essentials site succeeded.
+
 ## What Did Not Work Yet
 
 The full sniffed spec was too noisy to generate cleanly as-is. It captured a broad Omada web-console surface, including account/central/controller endpoints that are not all useful for WhoFi.
 
-The generated focused CLI is a scaffold, not a finished Omada client. Omada Essentials needs a web-console session convention:
+The generated focused CLI started as a scaffold, not a finished Omada client. Omada Essentials needs a web-console session convention:
 
 - login through the controller `/api/v2/login` route
 - capture the CSRF/session token
@@ -52,7 +54,7 @@ The generated focused CLI is a scaffold, not a finished Omada client. Omada Esse
 - include console-style headers such as `X-Requested-With` and `Omada-Request-Source`
 - send the HAR-observed active-client POST body
 
-Printing Press generated endpoint wrappers, but it did not automatically infer this multi-step session flow as a first-class auth provider.
+Printing Press generated endpoint wrappers, but it did not automatically infer this multi-step session flow as a first-class auth provider. The private spike proved this can be patched as a small custom command.
 
 ## Recommendation
 
@@ -60,9 +62,9 @@ Use Printing Press for Omada in this order:
 
 1. Keep WhoFi's current TypeScript Omada connector as the app runtime path.
 2. Maintain a private focused Printing Press spec for Omada Essentials read-only telemetry.
-3. Patch the generated CLI's auth/session layer to match the proven HAR request convention.
+3. Keep the hand-patched `whofi observations` command in the private generated CLI.
 4. Use the CLI for diagnostics and repeatable connector tests.
-5. Reuse the stable pieces back into WhoFi only after the CLI passes live read-only smoke tests.
+5. Reuse the stable pieces back into WhoFi only after the CLI has a cleaner rebuild/patch story.
 
 Do not publish a public Omada CLI until the auth/session approach is stable and does not expose private captured traffic, controller IDs, site IDs, MACs, IPs, cookies, tokens, or organization data.
 

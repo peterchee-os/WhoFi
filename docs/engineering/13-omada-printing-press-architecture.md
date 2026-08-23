@@ -144,6 +144,8 @@ In parallel, evolve Option B as a private spike:
 4. Use it as a connector test harness.
 5. Only make it a runtime dependency after it is more boring than the TypeScript path.
 
+Current status: the private spike has a hand-patched `whofi observations` command and has passed a private read-only live smoke test. The remaining architecture question is packaging, repeatable regeneration, and whether WhoFi should call the CLI or continue using the TypeScript connector.
+
 ## Required Omada Session Flow
 
 The printed CLI must learn this flow:
@@ -193,7 +195,7 @@ The public repo can document names and purposes. Real values belong only in priv
 
 ## Output Contract
 
-The Omada CLI should ultimately emit WhoFi-ready observations:
+The Omada CLI emits WhoFi-ready observations:
 
 ```json
 {
@@ -213,7 +215,7 @@ The Omada CLI should ultimately emit WhoFi-ready observations:
 }
 ```
 
-The CLI may also expose raw controller output for diagnostics, but WhoFi should consume normalized output by default.
+The CLI may also expose raw controller output for diagnostics, but WhoFi should consume normalized output by default. The private spike now omits raw payloads by default and requires an explicit raw-output flag for diagnostics. Any raw output mode should be opt-in and should not be used in public fixtures or docs.
 
 ## Safety Rules
 
@@ -222,4 +224,3 @@ The CLI may also expose raw controller output for diagnostics, but WhoFi should 
 - Do not publish the Omada CLI until auth/session behavior is stable and reviewed.
 - Keep the first connector read-only.
 - Treat block/quarantine/captive-portal actions as later, explicit features.
-

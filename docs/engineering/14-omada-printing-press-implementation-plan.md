@@ -20,10 +20,18 @@ Completed:
   - `auth login`
   - `auth init-info`
   - `clients <controller_id> <site_id>`
+- Private generated CLI hand-patched with:
+  - `whofi observations`
+  - Omada login/init-info/client-list session flow
+  - WhoFi-normalized observation output
+- Private read-only live smoke test succeeded.
+- Private patch file created for the `whofi observations` command.
+- Private patch file applied successfully to a fresh generated CLI and the regenerated patched CLI passed the same private live smoke test.
+- Normalized CLI output omits raw Omada payloads by default; raw output is opt-in for private diagnostics only.
 
 Known issue:
 
-- Generated endpoint wrappers do not yet implement Omada's multi-step web-console auth/session convention.
+- Decide whether a patch file is enough or whether a small maintained private companion module is cleaner.
 
 ## Phase 1: Keep The Private Spike Organized
 
@@ -95,6 +103,8 @@ OMADA_ESSENTIAL_PASSWORD
 
 These are CLI-specific names. WhoFi app env names may remain `OMADA_*`.
 
+Status: complete as a private hand patch with a saved private patch file. Patch application after fresh generation has been verified.
+
 ## Phase 3: Add WhoFi-Native Commands
 
 The generated command surface is technically correct but not operator-friendly enough.
@@ -102,14 +112,19 @@ The generated command surface is technically correct but not operator-friendly e
 Add hand-polished commands:
 
 ```text
-omada-essential-pp-cli clients active
 omada-essential-pp-cli observations list
 omada-essential-pp-cli observations sync
 omada-essential-pp-cli sites current
 omada-essential-pp-cli doctor --live
 ```
 
-`observations list` should emit WhoFi's normalized network observation shape.
+The private spike currently has:
+
+```text
+omada-essential-pp-cli whofi observations
+```
+
+This command emits WhoFi's normalized network observation shape.
 
 `observations sync` can later write to:
 
@@ -127,13 +142,18 @@ doctor without env -> fails with missing config names only
 doctor with env -> validates base URL and auth readiness
 auth login -> returns no token in human output
 clients active --json -> returns active clients
-observations list --json -> returns normalized observations
+whofi observations --json -> returns normalized observations
 bad password -> redacted auth failure
 bad site id -> redacted API failure
 no network -> timeout with useful error
 ```
 
 Never commit live test output with real client data.
+
+Status:
+
+- `whofi observations --json` live read-only smoke test passed privately.
+- Negative-path tests still need to be scripted.
 
 ## Phase 5: Decide Runtime Integration
 
@@ -181,9 +201,10 @@ When this work advances, update:
 Current best next task:
 
 ```text
-Patch generated omada-essential-pp-cli auth/session handling in the private spike folder,
-then run a private live read-only clients-active smoke test.
+Harden the private Omada CLI:
+  script negative-path tests,
+  add doctor --live behavior,
+  identify a post-generation hook or cleaner companion-module strategy.
 ```
 
 Do not move the generated CLI into the public WhoFi repo until it passes that smoke test and has been scrubbed for private artifacts.
-
