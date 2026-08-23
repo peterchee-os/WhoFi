@@ -196,6 +196,15 @@ select {
   padding: 0;
 }
 
+.icon-button.table-action {
+  width: 32px;
+  min-height: 32px;
+}
+
+.text-button.danger {
+  color: var(--red);
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -228,6 +237,10 @@ select {
   display: grid;
   grid-template-columns: minmax(0, 1.8fr) minmax(320px, 0.9fr);
   gap: 18px;
+}
+
+.content-grid.detail-layout {
+  grid-template-columns: minmax(0, 1.6fr) minmax(340px, 0.8fr);
 }
 
 .panel {
@@ -280,6 +293,10 @@ select {
 
 .device-table td {
   font-size: 14px;
+}
+
+.device-table tr.selected-row td {
+  background: #f0f7f5;
 }
 
 .device-name {
@@ -357,6 +374,7 @@ select {
 .side-stack {
   display: grid;
   gap: 18px;
+  align-content: start;
 }
 
 .list {
@@ -407,6 +425,64 @@ select {
   place-items: center;
   font-size: 13px;
   font-weight: 800;
+}
+
+.detail-body {
+  padding: 16px 18px 18px;
+  display: grid;
+  gap: 16px;
+}
+
+.detail-title {
+  display: grid;
+  gap: 5px;
+}
+
+.detail-title strong {
+  font-size: 18px;
+}
+
+.detail-title span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.kv-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.kv-list div {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+}
+
+.kv-list dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.kv-list dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.action-grid .text-button {
+  width: 100%;
 }
 
 .profile-grid {

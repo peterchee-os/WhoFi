@@ -4,12 +4,15 @@ import { useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
-  Bot,
+  Ban,
+  Check,
   Download,
+  Eye,
   Gauge,
   RefreshCcw,
   Search,
   ShieldCheck,
+  UserPlus,
   Users,
   Wifi,
   type LucideIcon
@@ -66,6 +69,7 @@ const viewTitles: Record<View, { title: string; subtitle: string }> = {
 export default function Home() {
   const [activeView, setActiveView] = useState<View>("dashboard");
   const [query, setQuery] = useState("");
+  const [selectedDeviceId, setSelectedDeviceId] = useState("dev-unknown-burst");
 
   const filteredDevices = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -90,6 +94,7 @@ export default function Home() {
   }, [query]);
 
   const title = viewTitles[activeView];
+  const selectedDevice = demoDevices.find((device) => device.id === selectedDeviceId) ?? demoDevices[0];
 
   return (
     <main className="app-shell">
@@ -153,8 +158,17 @@ export default function Home() {
 
         <Metrics />
 
-        {activeView === "dashboard" ? <DashboardView devices={filteredDevices} /> : null}
-        {activeView === "devices" ? <DevicesView devices={filteredDevices} /> : null}
+        {activeView === "dashboard" ? (
+          <DashboardView
+            devices={filteredDevices}
+            onSelectDevice={setSelectedDeviceId}
+            selectedDevice={selectedDevice}
+            selectedDeviceId={selectedDeviceId}
+          />
+        ) : null}
+        {activeView === "devices" ? (
+          <DevicesView devices={filteredDevices} onSelectDevice={setSelectedDeviceId} selectedDeviceId={selectedDeviceId} />
+        ) : null}
         {activeView === "profiles" ? <ProfilesView profiles={demoProfiles} /> : null}
         {activeView === "alerts" ? <AlertsView /> : null}
       </section>
@@ -185,23 +199,47 @@ function Metrics() {
   );
 }
 
-function DashboardView({ devices }: { devices: Device[] }) {
+function DashboardView({
+  devices,
+  onSelectDevice,
+  selectedDevice,
+  selectedDeviceId
+}: {
+  devices: Device[];
+  onSelectDevice: (deviceId: string) => void;
+  selectedDevice: Device;
+  selectedDeviceId: string;
+}) {
   return (
     <section className="content-grid">
-      <DeviceLedger devices={devices} compact />
+      <DeviceLedger devices={devices} compact onSelectDevice={onSelectDevice} selectedDeviceId={selectedDeviceId} />
 
       <div className="side-stack">
+        <DeviceInspector device={selectedDevice} />
         <OwnerMix />
         <AlertQueue limit={3} />
-        <ProfileSummary />
-        <AgentSummary />
       </div>
     </section>
   );
 }
 
-function DevicesView({ devices }: { devices: Device[] }) {
-  return <DeviceLedger devices={devices} />;
+function DevicesView({
+  devices,
+  onSelectDevice,
+  selectedDeviceId
+}: {
+  devices: Device[];
+  onSelectDevice: (deviceId: string) => void;
+  selectedDeviceId: string;
+}) {
+  const selectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? devices[0];
+
+  return (
+    <section className="content-grid detail-layout">
+      <DeviceLedger devices={devices} onSelectDevice={onSelectDevice} selectedDeviceId={selectedDeviceId} />
+      <div className="side-stack">{selectedDevice ? <DeviceInspector device={selectedDevice} /> : <EmptyPanel />}</div>
+    </section>
+  );
 }
 
 function ProfilesView({ profiles }: { profiles: Profile[] }) {
@@ -231,7 +269,17 @@ function AlertsView() {
   return <AlertQueue />;
 }
 
-function DeviceLedger({ devices, compact = false }: { devices: Device[]; compact?: boolean }) {
+function DeviceLedger({
+  devices,
+  compact = false,
+  onSelectDevice,
+  selectedDeviceId
+}: {
+  devices: Device[];
+  compact?: boolean;
+  onSelectDevice: (deviceId: string) => void;
+  selectedDeviceId: string;
+}) {
   const shownDevices = compact ? devices.slice(0, 6) : devices;
 
   return (
@@ -247,11 +295,12 @@ function DeviceLedger({ devices, compact = false }: { devices: Device[]; compact
       <table className="device-table">
         <thead>
           <tr>
-            <th style={{ width: "28%" }}>Device</th>
-            <th style={{ width: "20%" }}>Owner</th>
+            <th style={{ width: "27%" }}>Device</th>
+            <th style={{ width: "19%" }}>Owner</th>
             <th style={{ width: "18%" }}>Network</th>
-            <th style={{ width: "18%" }}>Usage</th>
-            <th style={{ width: "16%" }}>Signal</th>
+            <th style={{ width: "17%" }}>Usage</th>
+            <th style={{ width: "15%" }}>Signal</th>
+            <th style={{ width: "4%" }} aria-label="Inspect" />
           </tr>
         </thead>
         <tbody>
@@ -260,7 +309,7 @@ function DeviceLedger({ devices, compact = false }: { devices: Device[]; compact
             const usage = device.rxBytes + device.txBytes;
 
             return (
-              <tr key={device.id}>
+              <tr className={selectedDeviceId === device.id ? "selected-row" : ""} key={device.id}>
                 <td>
                   <div className="device-name">
                     <strong>{device.hostname}</strong>
@@ -293,12 +342,96 @@ function DeviceLedger({ devices, compact = false }: { devices: Device[]; compact
                     {device.privateMacSuspected ? <span className="badge watch">Private MAC</span> : null}
                   </div>
                 </td>
+                <td>
+                  <button className="icon-button table-action" onClick={() => onSelectDevice(device.id)} title="Inspect">
+                    <Eye size={16} />
+                  </button>
+                </td>
               </tr>
             );
           })}
         </tbody>
       </table>
     </div>
+  );
+}
+
+function DeviceInspector({ device }: { device: Device }) {
+  const profile = device.profileId ? profileById.get(device.profileId) : undefined;
+  const usage = device.rxBytes + device.txBytes;
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <h3>Inspect</h3>
+          <p>{device.hostname}</p>
+        </div>
+        <StatusBadge state={device.riskState} />
+      </div>
+      <div className="detail-body">
+        <div className="detail-title">
+          <strong>{profile?.displayName ?? "Unclaimed"}</strong>
+          <span>{profile?.organizationName ?? "No owner assigned"}</span>
+        </div>
+
+        <dl className="kv-list">
+          <div>
+            <dt>MAC</dt>
+            <dd>{device.mac}</dd>
+          </div>
+          <div>
+            <dt>IP</dt>
+            <dd>{device.ip}</dd>
+          </div>
+          <div>
+            <dt>SSID</dt>
+            <dd>{device.ssid}</dd>
+          </div>
+          <div>
+            <dt>AP</dt>
+            <dd>{device.apName}</dd>
+          </div>
+          <div>
+            <dt>Usage</dt>
+            <dd>{formatBytes(usage)}</dd>
+          </div>
+          <div>
+            <dt>Last seen</dt>
+            <dd>{formatRelativeTime(device.lastSeen)}</dd>
+          </div>
+        </dl>
+
+        <div className="action-grid">
+          <button className="text-button" title="Assign owner">
+            <UserPlus size={17} />
+            Assign
+          </button>
+          <button className="text-button" title="Mark reviewed">
+            <Check size={17} />
+            Reviewed
+          </button>
+          <button className="text-button" title="Watch device">
+            <Eye size={17} />
+            Watch
+          </button>
+          <button className="text-button danger" title="Block device">
+            <Ban size={17} />
+            Block
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function EmptyPanel() {
+  return (
+    <section className="panel">
+      <div className="list-item">
+        <strong>No matching device</strong>
+      </div>
+    </section>
   );
 }
 
@@ -349,59 +482,6 @@ function AlertQueue({ limit }: { limit?: number }) {
             <p>{alert.status} · {formatRelativeTime(alert.openedAt)}</p>
           </div>
         ))}
-      </div>
-    </section>
-  );
-}
-
-function ProfileSummary() {
-  return (
-    <section className="panel">
-      <div className="panel-header">
-        <div>
-          <h3>Profiles</h3>
-          <p>{demoProfiles.length} known owners.</p>
-        </div>
-        <ShieldCheck size={20} color="var(--green)" />
-      </div>
-      <div className="profile-grid">
-        {demoProfiles.map((profile) => (
-          <div className="profile-card" key={profile.id}>
-            <strong className="truncate">{profile.displayName}</strong>
-            <span>{profile.profileType} · {profile.profileLevel}</span>
-            <span className="truncate">{profile.organizationName ?? "No organization"}</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function AgentSummary() {
-  return (
-    <section className="panel">
-      <div className="panel-header">
-        <div>
-          <h3>Agent Identity</h3>
-          <p>Registered hosts.</p>
-        </div>
-        <Bot size={20} color="var(--blue)" />
-      </div>
-      <div className="list">
-        <div className="list-item">
-          <div className="list-title">
-            <strong>Ava Runner</strong>
-            <StatusBadge state="known_agent" />
-          </div>
-          <p>Heartbeat current. Usage expected.</p>
-        </div>
-        <div className="list-item">
-          <div className="list-title">
-            <strong>ubuntu</strong>
-            <StatusBadge state="automation_like" />
-          </div>
-          <p>Traffic burst detected. Identity unclaimed.</p>
-        </div>
       </div>
     </section>
   );
