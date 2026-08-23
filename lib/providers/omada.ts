@@ -17,9 +17,10 @@ export type OmadaClientSnapshot = {
 
 export type OmadaProviderConfig = NetworkProviderConfig & {
   type: "omada";
-  baseUrl?: string;
+  apiBaseUrl?: string;
   controllerId?: string;
   siteId?: string;
+  siteName?: string;
 };
 
 export function normalizeOmadaClientSnapshot(
@@ -53,4 +54,3 @@ function normalizeObservedAt(value: OmadaClientSnapshot["lastSeen"], fallback: s
   const milliseconds = value > 10_000_000_000 ? value : value * 1000;
   return new Date(milliseconds).toISOString();
 }
-

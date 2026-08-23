@@ -162,6 +162,29 @@ Open spike questions:
 - whether cloud and hardware controller APIs differ enough to require subtypes
 - how to handle rate limits and sessions
 
+Current browser recon notes:
+
+- Shared Chrome has an authenticated Omada Cloud tab for the Thinkspace organization.
+- The visible console is the Omada Cloud Management Platform in the US East region.
+- The active UI is the Essential Controller experience.
+- The selected site in the UI was Seattle during recon.
+- Client table columns visible in the UI: client name, IP address, authentication type, status, SSID, network, AP/port, download traffic, uptime, and actions.
+- The loaded public bundle defines the current clients endpoint as `/{omadacId}/api/v2/sites/{siteId}/insight/clients`.
+- Related actions exist for block/unblock/delete client and past connection/portal-auth history, but MVP should stay read-only.
+
+Expected server-side config:
+
+- `OMADA_API_BASE_URL`: Essential Controller API host, e.g. regional Omada Essential Controller API base URL.
+- `OMADA_CONTROLLER_ID`: the Omada controller/org id path segment used before `/api/v2`.
+- `OMADA_SITE_ID`: selected site id, such as Seattle or Redmond once mapped.
+- `OMADA_SITE_NAME`: optional display name for operator clarity.
+- `OMADA_USERNAME` and `OMADA_PASSWORD`: server-side credentials or secret references for the TP-Link/Omada account.
+
+Credential note:
+
+- Thinkspace has a 1Password item named `Omada TPLink Cloud WIFI SEA`.
+- Do not commit values from that item. Use it only for private deployment env injection or local spike work.
+
 ## Cisco Meraki Connector
 
 Meraki should be an exact network module because Redmond uses Cisco Meraki gear.

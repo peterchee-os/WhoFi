@@ -11,7 +11,7 @@ export function getNetworkProviderConfigStatus(env: NodeJS.ProcessEnv = process.
     getStatus({
       displayName: "Omada",
       providerId: "omada",
-      required: ["OMADA_BASE_URL", "OMADA_SITE_ID", "OMADA_USERNAME", "OMADA_PASSWORD"],
+      required: ["OMADA_API_BASE_URL", "OMADA_CONTROLLER_ID", "OMADA_SITE_ID", "OMADA_USERNAME", "OMADA_PASSWORD"],
       env
     }),
     getStatus({

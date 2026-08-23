@@ -86,8 +86,10 @@ network_providers:
     type: "omada"
     display_name: "Main Omada"
     config:
-      base_url: "${OMADA_BASE_URL}"
+      api_base_url: "${OMADA_API_BASE_URL}"
       controller_id: "${OMADA_CONTROLLER_ID}"
+      site_id: "${OMADA_SITE_ID}"
+      site_name: "${OMADA_SITE_NAME}"
       username: "${OMADA_USERNAME}"
       password: "${OMADA_PASSWORD}"
   - id: "meraki-redmond"
