@@ -488,6 +488,46 @@ textarea {
   align-content: start;
 }
 
+.usage-layout {
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+}
+
+.usage-summary {
+  padding: 16px 18px 18px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.usage-summary div {
+  min-height: 78px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  align-content: space-between;
+}
+
+.usage-summary span,
+.usage-rollup p {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.usage-summary strong {
+  font-size: 22px;
+}
+
+.usage-rollup-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.usage-rollup {
+  min-width: 0;
+}
+
 .list {
   display: grid;
 }
@@ -959,7 +999,7 @@ textarea {
   }
 
   .nav {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .nav-item {

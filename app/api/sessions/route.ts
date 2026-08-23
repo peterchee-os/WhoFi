@@ -5,6 +5,7 @@ import {
   readDeviceSource,
   redactDeviceSourceError
 } from "@/lib/device-snapshots";
+import { buildSessionSnapshot } from "@/lib/session-rollups";
 
 export const runtime = "nodejs";
 
@@ -25,9 +26,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    return NextResponse.json(await loadDeviceSnapshot(source));
+    const deviceSnapshot = await loadDeviceSnapshot(source);
+    return NextResponse.json(buildSessionSnapshot(deviceSnapshot));
   } catch (error) {
-    const message = error instanceof Error ? redactDeviceSourceError(error.message) : "Device snapshot failed";
+    const message = error instanceof Error ? redactDeviceSourceError(error.message) : "Session snapshot failed";
     const status = message.includes("required") ? 409 : 502;
 
     return NextResponse.json(

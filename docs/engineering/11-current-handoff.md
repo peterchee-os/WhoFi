@@ -14,6 +14,7 @@ Latest completed slices:
 - search across device, owner, profile, and network fields
 - device inspection panel
 - dashboard source switcher for Demo, Omada, and optional Omada Printing Press CLI snapshots
+- Usage view with current snapshot totals and rollups by location, SSID, and AP
 - local review actions: assign, reviewed, watch, block
 - local alert actions: acknowledge, resolve
 - localStorage persistence for demo review state
@@ -23,6 +24,7 @@ Latest completed slices:
 - optional verification anchor support for client MAC or AP/BSSID MAC smoke tests
 - live device snapshot gate via `WHOFI_ENABLE_LIVE_DEVICE_SOURCES`
 - optional live source token via `WHOFI_LIVE_DEVICE_SOURCE_TOKEN`
+- `/api/sessions` endpoint with the same source, gate, and token behavior as `/api/devices`
 
 The UI intentionally avoids visible product-mode tabs such as event/coworking/home. The product can support those contexts internally, but the operator experience should stay focused on who and what is on the WiFi.
 
@@ -109,7 +111,7 @@ Do not start with:
 Next practical order:
 
 1. Add app-level admin authentication.
-2. Demo data cleanup and responsive pass.
-3. Lightweight in-memory/server-side provider interface for notifications.
-4. Persisted database schema.
+2. Persist device snapshots and session rollups instead of deriving them only in memory.
+3. Demo data cleanup and responsive pass.
+4. Lightweight in-memory/server-side provider interface for notifications.
 5. Settings/Notifications UI polish if needed.

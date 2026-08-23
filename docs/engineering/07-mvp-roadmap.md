@@ -55,6 +55,13 @@ Deliverables:
 - session rollups
 - bandwidth by device/location/day
 
+Current implementation:
+
+- `GET /api/devices` returns selected-source device snapshots for demo, Omada, or optional Omada Printing Press CLI.
+- `GET /api/sessions` returns aggregate usage rollups from the selected source by location, SSID, and AP.
+- The dashboard Usage view renders current snapshot totals and rollups.
+- Live Omada snapshots require `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true` and optionally `WHOFI_LIVE_DEVICE_SOURCE_TOKEN`.
+
 Exit criteria:
 
 - list online clients from an existing Omada Essentials org

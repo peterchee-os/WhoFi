@@ -26,9 +26,10 @@ import { demoAlerts, demoDevices, demoProfiles } from "@/lib/demo-data";
 import { formatBytes, formatRelativeTime, percent } from "@/lib/format";
 import { integrationCatalog, type IntegrationCatalogItem } from "@/lib/integrations/catalog";
 import { resolveDevices, type DeviceResolution } from "@/lib/resolution";
+import { buildSessionSnapshot, type SessionSnapshot, type UsageRollup, type UsageRollupDimension } from "@/lib/session-rollups";
 import type { Alert, AlertStatus, Device, DeviceStatus, Profile, RiskState } from "@/lib/types";
 
-type View = "dashboard" | "devices" | "profiles" | "alerts" | "settings";
+type View = "dashboard" | "devices" | "usage" | "profiles" | "alerts" | "settings";
 type DeviceSnapshotSource = "demo" | "omada" | "omada-pp";
 type NotificationProviderMode = "disabled" | "console" | "resend";
 type EmailDeliveryStatus = "sent" | "failed" | "disabled" | "rendered";
@@ -128,6 +129,7 @@ type ActivityEntry = {
 const navItems: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: "dashboard", label: "Dashboard", icon: Gauge },
   { id: "devices", label: "Devices", icon: Wifi },
+  { id: "usage", label: "Usage", icon: Activity },
   { id: "profiles", label: "Profiles", icon: Users },
   { id: "alerts", label: "Alerts", icon: AlertTriangle },
   { id: "settings", label: "Settings", icon: Settings }
@@ -157,6 +159,10 @@ const viewTitles: Record<View, { title: string; subtitle: string }> = {
   devices: {
     title: "Devices",
     subtitle: "Current clients and ownership state."
+  },
+  usage: {
+    title: "Usage",
+    subtitle: "Session rollups by location, SSID, and AP."
   },
   profiles: {
     title: "Profiles",
@@ -254,6 +260,7 @@ export default function Home() {
   const [selectedDeviceId, setSelectedDeviceId] = useState("dev-unknown-burst");
   const [deviceSnapshotSource, setDeviceSnapshotSource] = useState<DeviceSnapshotSource>("demo");
   const [liveSourceToken, setLiveSourceToken] = useState("");
+  const [snapshotObservedAt, setSnapshotObservedAt] = useState(new Date().toISOString());
   const [liveSourceAccess, setLiveSourceAccess] = useState<LiveSourceAccess>({
     enabled: false,
     loaded: false,
@@ -378,6 +385,15 @@ export default function Home() {
   }, [alertStatusOverrides]);
 
   const metrics = useMemo(() => getMetrics(devices, alerts), [alerts, devices]);
+  const sessionSnapshot = useMemo(
+    () => buildSessionSnapshot({
+      count: devices.length,
+      devices,
+      observedAt: snapshotObservedAt,
+      source: deviceSnapshotSource
+    }),
+    [deviceSnapshotSource, devices, snapshotObservedAt]
+  );
   const maxUsage = useMemo(() => Math.max(0, ...devices.map((device) => device.rxBytes + device.txBytes)), [devices]);
   const resolutions = useMemo(() => resolveDevices(devices, demoProfiles), [devices]);
   const resolutionByDeviceId = useMemo(
@@ -420,6 +436,7 @@ export default function Home() {
       setDeviceSnapshotSource("demo");
       setSourceDevices(demoDevices);
       setSelectedDeviceId("dev-unknown-burst");
+      setSnapshotObservedAt(new Date().toISOString());
       setSourceState({
         message: "Demo",
         status: "success",
@@ -456,6 +473,7 @@ export default function Home() {
       setDeviceSnapshotSource(source);
       setSourceDevices(payload.devices);
       setSelectedDeviceId(payload.devices[0]?.id ?? "");
+      setSnapshotObservedAt(new Date().toISOString());
       setSourceState({
         message: formatSourceStateMessage(payload.devices.length, payload.verificationClient),
         status: "success",
@@ -520,6 +538,7 @@ export default function Home() {
     setStatusOverrides({});
     setDeviceSnapshotSource("demo");
     setSourceDevices(demoDevices);
+    setSnapshotObservedAt(new Date().toISOString());
     setSourceState({
       message: "Demo",
       status: "success"
@@ -676,6 +695,7 @@ export default function Home() {
             selectedDeviceId={selectedDeviceId}
           />
         ) : null}
+        {activeView === "usage" ? <UsageView sessionSnapshot={sessionSnapshot} /> : null}
         {activeView === "profiles" ? <ProfilesView profiles={demoProfiles} /> : null}
         {activeView === "alerts" ? <AlertsView alerts={alerts} onSetAlertStatus={setAlertStatus} /> : null}
         {activeView === "settings" ? (
@@ -836,6 +856,104 @@ function DevicesView({
         )}
       </div>
     </section>
+  );
+}
+
+function UsageView({ sessionSnapshot }: { sessionSnapshot: SessionSnapshot }) {
+  const maxRollupBytes = Math.max(0, ...sessionSnapshot.rollups.map((rollup) => rollup.totalBytes));
+
+  return (
+    <section className="content-grid usage-layout">
+      <div className="panel">
+        <div className="panel-header">
+          <div>
+            <h3>Session Totals</h3>
+            <p>{formatDeviceSourceLabel(sessionSnapshot.source)} snapshot · <RelativeTime value={sessionSnapshot.observedAt} /></p>
+          </div>
+          <Activity size={20} color="var(--teal-dark)" />
+        </div>
+        <div className="usage-summary">
+          <div>
+            <span>Total usage</span>
+            <strong>{formatBytes(sessionSnapshot.totals.totalBytes)}</strong>
+          </div>
+          <div>
+            <span>Download</span>
+            <strong>{formatBytes(sessionSnapshot.totals.totalRxBytes)}</strong>
+          </div>
+          <div>
+            <span>Upload</span>
+            <strong>{formatBytes(sessionSnapshot.totals.totalTxBytes)}</strong>
+          </div>
+          <div>
+            <span>Unknown</span>
+            <strong>{sessionSnapshot.totals.unknownDevices}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div className="usage-rollup-grid">
+        <UsageRollupPanel
+          dimension="location"
+          maxBytes={maxRollupBytes}
+          rollups={sessionSnapshot.rollups}
+          title="Locations"
+        />
+        <UsageRollupPanel
+          dimension="ssid"
+          maxBytes={maxRollupBytes}
+          rollups={sessionSnapshot.rollups}
+          title="SSIDs"
+        />
+        <UsageRollupPanel
+          dimension="ap"
+          maxBytes={maxRollupBytes}
+          rollups={sessionSnapshot.rollups}
+          title="Access Points"
+        />
+      </div>
+    </section>
+  );
+}
+
+function UsageRollupPanel({
+  dimension,
+  maxBytes,
+  rollups,
+  title
+}: {
+  dimension: UsageRollupDimension;
+  maxBytes: number;
+  rollups: UsageRollup[];
+  title: string;
+}) {
+  const visibleRollups = rollups.filter((rollup) => rollup.dimension === dimension).slice(0, 6);
+
+  return (
+    <div className="panel">
+      <div className="panel-header">
+        <div>
+          <h3>{title}</h3>
+          <p>{visibleRollups.length} active rollups.</p>
+        </div>
+      </div>
+      <div className="list">
+        {visibleRollups.map((rollup) => (
+          <div className="list-item compact-item usage-rollup" key={rollup.id}>
+            <div className="list-title">
+              <strong className="truncate">{rollup.label}</strong>
+              <span className="metric-pill">{formatBytes(rollup.totalBytes)}</span>
+            </div>
+            <div className="usage-bar" aria-label={`${rollup.label} usage`}>
+              <span style={{ width: `${percent(rollup.totalBytes, maxBytes)}` }} />
+            </div>
+            <p>
+              {rollup.onlineDevices} devices · {rollup.unknownDevices} unknown · top: {rollup.topDeviceHostname ?? "none"}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

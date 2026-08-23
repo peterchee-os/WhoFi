@@ -46,6 +46,8 @@ WhoFi should support:
 - hosted/self-hosted production mode with a persistent database, scheduled collectors, alerts, and optional captive portal
 - optional collector mode for networks where the WiFi controller is only reachable from inside the coworking LAN
 
+The current demo app includes device review, source switching, notification settings, provider readiness, and usage rollups by location, SSID, and AP.
+
 ## Repository Principle
 
 This repo must be safe to publish.
