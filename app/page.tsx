@@ -617,6 +617,33 @@ export default function Home() {
     addActivity(setActivity, `Exported stored snapshot capture ${selectedSnapshotCapture.id}`);
   };
 
+  const exportSelectedSnapshotReport = async () => {
+    if (!selectedSnapshotCaptureId) return;
+
+    try {
+      const response = await fetch(`/api/snapshot-history/${encodeURIComponent(selectedSnapshotCaptureId)}/report`);
+      if (!response.ok) throw new Error("Capture report export failed");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `whofi-capture-${selectedSnapshotCaptureId}.md`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setNotice("Capture report exported");
+      addActivity(setActivity, `Exported stored snapshot capture report ${selectedSnapshotCaptureId}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Capture report export failed";
+      setSnapshotCaptureState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Capture report export failed");
+    }
+  };
+
   const useSelectedSnapshotCapture = () => {
     if (!selectedSnapshotCapture) return;
     const snapshot = selectedSnapshotCapture.deviceSnapshot;
@@ -1036,6 +1063,7 @@ export default function Home() {
             onClearSnapshotHistory={clearSnapshotHistory}
             onDeleteSelectedSnapshotCapture={deleteSelectedSnapshotCapture}
             onExportSelectedSnapshotCapture={exportSelectedSnapshotCapture}
+            onExportSelectedSnapshotReport={exportSelectedSnapshotReport}
             onLoadSnapshotCapture={loadSnapshotCapture}
             onSnapshotReviewNoteChange={setSnapshotReviewNoteDraft}
             onUpdateSnapshotReview={updateSelectedSnapshotReview}
@@ -1317,6 +1345,7 @@ function UsageView({
   onClearSnapshotHistory,
   onDeleteSelectedSnapshotCapture,
   onExportSelectedSnapshotCapture,
+  onExportSelectedSnapshotReport,
   onLoadSnapshotCapture,
   onSnapshotReviewNoteChange,
   onUpdateSnapshotReview,
@@ -1333,6 +1362,7 @@ function UsageView({
   onClearSnapshotHistory: () => void;
   onDeleteSelectedSnapshotCapture: () => void;
   onExportSelectedSnapshotCapture: () => void;
+  onExportSelectedSnapshotReport: () => void;
   onLoadSnapshotCapture: (entryId: string) => void;
   onSnapshotReviewNoteChange: (value: string) => void;
   onUpdateSnapshotReview: (reviewed?: boolean) => void;
@@ -1407,6 +1437,7 @@ function UsageView({
           comparison={selectedSnapshotComparison}
           onDelete={onDeleteSelectedSnapshotCapture}
           onExport={onExportSelectedSnapshotCapture}
+          onExportReport={onExportSelectedSnapshotReport}
           onReviewNoteChange={onSnapshotReviewNoteChange}
           onUpdateReview={onUpdateSnapshotReview}
           onUseCapture={onUseSelectedSnapshotCapture}
@@ -1482,6 +1513,7 @@ function SnapshotCapturePanel({
   comparison,
   onDelete,
   onExport,
+  onExportReport,
   onReviewNoteChange,
   onUpdateReview,
   onUseCapture,
@@ -1492,6 +1524,7 @@ function SnapshotCapturePanel({
   comparison?: SnapshotCaptureComparison;
   onDelete: () => void;
   onExport: () => void;
+  onExportReport: () => void;
   onReviewNoteChange: (value: string) => void;
   onUpdateReview: (reviewed?: boolean) => void;
   onUseCapture: () => void;
@@ -1523,6 +1556,9 @@ function SnapshotCapturePanel({
           <button className="text-button slim" disabled={!capture} onClick={onExport} title="Export selected capture JSON" type="button">
             <Download size={16} />
             Export JSON
+          </button>
+          <button className="text-button slim" disabled={!capture} onClick={onExportReport} title="Export capture report" type="button">
+            Report
           </button>
           <button className="text-button slim" disabled={!capture} onClick={onDelete} type="button">
             Delete

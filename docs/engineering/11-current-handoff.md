@@ -14,7 +14,7 @@ Latest completed slices:
 - search across device, owner, profile, and network fields
 - device inspection panel
 - dashboard source switcher for Demo, Omada, and optional Omada Printing Press CLI snapshots
-- Usage view with current snapshot totals, source-filtered recent history, stored capture detail, selected-capture export, stored-capture replay, review notes, reviewed state, single-capture deletion, previous-capture deltas, new/missing device movement, generated review-signal hints, and rollups by location, SSID, and AP
+- Usage view with current snapshot totals, source-filtered recent history, stored capture detail, selected-capture JSON/Markdown export, stored-capture replay, review notes, reviewed state, single-capture deletion, previous-capture deltas, new/missing device movement, generated review-signal hints, and rollups by location, SSID, and AP
 - local file-backed snapshot audit history at `.whofi/snapshot-history.json`, with bounded full captures and `WHOFI_SNAPSHOT_HISTORY_PATH` override
 - local review actions: assign, reviewed, watch, block
 - local alert actions: acknowledge, resolve
@@ -28,6 +28,7 @@ Latest completed slices:
 - `/api/sessions` endpoint with the same source, gate, and token behavior as `/api/devices`
 - `POST /api/snapshot-history/capture` endpoint for write/capture semantics; `/api/devices` remains read-only
 - `PATCH /api/snapshot-history/{id}` endpoint for review notes and reviewed/open state on stored captures
+- `GET /api/snapshot-history/{id}/report` endpoint for Markdown capture reports
 - `DELETE /api/snapshot-history/{id}` endpoint for removing one bad/noisy stored capture without clearing all history
 - optional app-level admin gate via `WHOFI_REQUIRE_ADMIN_AUTH`, `WHOFI_ADMIN_PASSWORD`, and `WHOFI_ADMIN_SESSION_SECRET`
 
