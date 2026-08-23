@@ -281,6 +281,7 @@ export default function Home() {
   const [selectedSnapshotComparison, setSelectedSnapshotComparison] = useState<SnapshotCaptureComparison>();
   const [selectedSnapshotCapture, setSelectedSnapshotCapture] = useState<SnapshotCaptureRecord>();
   const [selectedSnapshotCaptureId, setSelectedSnapshotCaptureId] = useState("");
+  const [snapshotReviewNoteDraft, setSnapshotReviewNoteDraft] = useState("");
   const [persistedSnapshotCaptureIds, setPersistedSnapshotCaptureIds] = useState<string[]>([]);
   const [snapshotCaptureState, setSnapshotCaptureState] = useState<IntegrationTestState>({
     message: "No capture selected",
@@ -548,6 +549,7 @@ export default function Home() {
       setSelectedSnapshotComparison(undefined);
       setSelectedSnapshotCapture(undefined);
       setSelectedSnapshotCaptureId("");
+      setSnapshotReviewNoteDraft("");
       setSnapshotCaptureState({
         message: "No capture selected",
         status: "idle"
@@ -579,6 +581,7 @@ export default function Home() {
       setSelectedSnapshotComparison(undefined);
       setSelectedSnapshotCapture(undefined);
       setSelectedSnapshotCaptureId("");
+      setSnapshotReviewNoteDraft("");
       setSnapshotCaptureState({
         message: "No capture selected",
         status: "idle"
@@ -614,6 +617,53 @@ export default function Home() {
     addActivity(setActivity, `Exported stored snapshot capture ${selectedSnapshotCapture.id}`);
   };
 
+  const updateSelectedSnapshotReview = async (reviewed?: boolean) => {
+    if (!selectedSnapshotCaptureId) return;
+
+    try {
+      const response = await fetch(`/api/snapshot-history/${encodeURIComponent(selectedSnapshotCaptureId)}`, {
+        body: JSON.stringify({
+          reviewNote: snapshotReviewNoteDraft,
+          reviewed
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "PATCH"
+      });
+      const payload = (await response.json()) as {
+        capture?: SnapshotCaptureRecord;
+        comparison?: SnapshotCaptureComparison;
+        entries?: SnapshotHistoryEntry[];
+        error?: string;
+      };
+      if (!response.ok || !payload.capture || !Array.isArray(payload.entries)) {
+        throw new Error(payload.error ?? "Capture review update failed");
+      }
+
+      setSelectedSnapshotCapture(payload.capture);
+      setSelectedSnapshotComparison(payload.comparison);
+      setPersistedSnapshotCaptureIds(payload.entries.map((entry) => entry.id));
+      setSnapshotHistory((current) => mergeSnapshotHistory(payload.entries ?? [], current).slice(0, 10));
+      setSnapshotReviewNoteDraft(payload.capture.summary.reviewNote ?? "");
+      setSnapshotCaptureState({
+        message: payload.capture.summary.reviewedAt ? "Capture reviewed" : "Capture note saved",
+        status: "success",
+        testedAt: new Date().toISOString()
+      });
+      setNotice(payload.capture.summary.reviewedAt ? "Capture reviewed" : "Capture note saved");
+      addActivity(setActivity, `${payload.capture.summary.reviewedAt ? "Reviewed" : "Updated"} stored snapshot capture`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Capture review update failed";
+      setSnapshotCaptureState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Capture review update failed");
+    }
+  };
+
   const loadSnapshotCapture = async (entryId: string) => {
     setSelectedSnapshotCaptureId(entryId);
     setSnapshotCaptureState({
@@ -634,6 +684,7 @@ export default function Home() {
 
       setSelectedSnapshotComparison(payload.comparison);
       setSelectedSnapshotCapture(payload.capture);
+      setSnapshotReviewNoteDraft(payload.capture.summary.reviewNote ?? "");
       setSnapshotCaptureState({
         message: "Capture loaded",
         status: "success",
@@ -644,6 +695,7 @@ export default function Home() {
       const message = error instanceof Error ? error.message : "Capture load failed";
       setSelectedSnapshotComparison(undefined);
       setSelectedSnapshotCapture(undefined);
+      setSnapshotReviewNoteDraft("");
       setSnapshotCaptureState({
         message,
         status: "error",
@@ -968,6 +1020,8 @@ export default function Home() {
             onDeleteSelectedSnapshotCapture={deleteSelectedSnapshotCapture}
             onExportSelectedSnapshotCapture={exportSelectedSnapshotCapture}
             onLoadSnapshotCapture={loadSnapshotCapture}
+            onSnapshotReviewNoteChange={setSnapshotReviewNoteDraft}
+            onUpdateSnapshotReview={updateSelectedSnapshotReview}
             persistedSnapshotCaptureIds={persistedSnapshotCaptureIds}
             selectedSnapshotComparison={selectedSnapshotComparison}
             selectedSnapshotCapture={selectedSnapshotCapture}
@@ -975,6 +1029,7 @@ export default function Home() {
             sessionSnapshot={sessionSnapshot}
             snapshotCaptureState={snapshotCaptureState}
             snapshotHistory={snapshotHistory}
+            snapshotReviewNoteDraft={snapshotReviewNoteDraft}
           />
         ) : null}
         {activeView === "profiles" ? <ProfilesView profiles={demoProfiles} /> : null}
@@ -1245,18 +1300,23 @@ function UsageView({
   onDeleteSelectedSnapshotCapture,
   onExportSelectedSnapshotCapture,
   onLoadSnapshotCapture,
+  onSnapshotReviewNoteChange,
+  onUpdateSnapshotReview,
   persistedSnapshotCaptureIds,
   selectedSnapshotComparison,
   selectedSnapshotCapture,
   selectedSnapshotCaptureId,
   sessionSnapshot,
   snapshotCaptureState,
-  snapshotHistory
+  snapshotHistory,
+  snapshotReviewNoteDraft
 }: {
   onClearSnapshotHistory: () => void;
   onDeleteSelectedSnapshotCapture: () => void;
   onExportSelectedSnapshotCapture: () => void;
   onLoadSnapshotCapture: (entryId: string) => void;
+  onSnapshotReviewNoteChange: (value: string) => void;
+  onUpdateSnapshotReview: (reviewed?: boolean) => void;
   persistedSnapshotCaptureIds: string[];
   selectedSnapshotComparison?: SnapshotCaptureComparison;
   selectedSnapshotCapture?: SnapshotCaptureRecord;
@@ -1264,6 +1324,7 @@ function UsageView({
   sessionSnapshot: SessionSnapshot;
   snapshotCaptureState: IntegrationTestState;
   snapshotHistory: SnapshotHistoryEntry[];
+  snapshotReviewNoteDraft: string;
 }) {
   const [historySourceFilter, setHistorySourceFilter] = useState<SnapshotHistorySourceFilter>("all");
   const maxRollupBytes = Math.max(0, ...sessionSnapshot.rollups.map((rollup) => rollup.totalBytes));
@@ -1326,6 +1387,9 @@ function UsageView({
           comparison={selectedSnapshotComparison}
           onDelete={onDeleteSelectedSnapshotCapture}
           onExport={onExportSelectedSnapshotCapture}
+          onReviewNoteChange={onSnapshotReviewNoteChange}
+          onUpdateReview={onUpdateSnapshotReview}
+          reviewNoteDraft={snapshotReviewNoteDraft}
           state={snapshotCaptureState}
         />
         <UsageRollupPanel
@@ -1397,12 +1461,18 @@ function SnapshotCapturePanel({
   comparison,
   onDelete,
   onExport,
+  onReviewNoteChange,
+  onUpdateReview,
+  reviewNoteDraft,
   state
 }: {
   capture?: SnapshotCaptureRecord;
   comparison?: SnapshotCaptureComparison;
   onDelete: () => void;
   onExport: () => void;
+  onReviewNoteChange: (value: string) => void;
+  onUpdateReview: (reviewed?: boolean) => void;
+  reviewNoteDraft: string;
   state: IntegrationTestState;
 }) {
   const topDevices = capture
@@ -1431,6 +1501,14 @@ function SnapshotCapturePanel({
           <button className="text-button slim" disabled={!capture} onClick={onDelete} type="button">
             Delete
           </button>
+          <button
+            className="text-button slim"
+            disabled={!capture}
+            onClick={() => onUpdateReview(!capture?.summary.reviewedAt)}
+            type="button"
+          >
+            {capture?.summary.reviewedAt ? "Unreview" : "Mark Reviewed"}
+          </button>
           <span className={`integration-state ${state.status}`}>{state.message}</span>
         </div>
       </div>
@@ -1453,6 +1531,20 @@ function SnapshotCapturePanel({
               <span>Rollups</span>
               <strong>{capture.sessionSnapshot.rollups.length}</strong>
             </div>
+            <div>
+              <span>Review</span>
+              <strong>{capture.summary.reviewedAt ? "Done" : "Open"}</strong>
+            </div>
+          </div>
+          <div className="capture-review-box">
+            <textarea
+              onChange={(event) => onReviewNoteChange(event.target.value)}
+              placeholder="Review note"
+              value={reviewNoteDraft}
+            />
+            <button className="text-button slim" onClick={() => onUpdateReview()} type="button">
+              Save Note
+            </button>
           </div>
           <div className="comparison-grid">
             <div>
@@ -1576,7 +1668,9 @@ function SnapshotHistoryPanel({
                 {formatBytes(entry.totalBytes)} · {entry.onlineDevices} devices · {entry.unknownDevices} unknown
               </p>
               <p className="truncate">Top: {formatHistoryTop(entry)}</p>
-              <p>{persisted ? "Stored capture" : "Local only"} · <RelativeTime value={entry.observedAt} /></p>
+              <p>
+                {entry.reviewedAt ? "Reviewed" : persisted ? "Stored capture" : "Local only"} · <RelativeTime value={entry.observedAt} />
+              </p>
             </button>
           );
         }) : (

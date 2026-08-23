@@ -74,6 +74,36 @@ export async function readSnapshotCaptureDetail(
   };
 }
 
+export async function updateSnapshotCaptureReview(
+  id: string,
+  update: { reviewNote?: string; reviewedAt?: string },
+  env: NodeJS.ProcessEnv = process.env
+): Promise<{ capture: SnapshotCaptureRecord; comparison?: SnapshotCaptureComparison; entries: SnapshotHistoryEntry[] } | undefined> {
+  const current = await readSnapshotHistoryFile(env);
+  let found = false;
+
+  const entries = current.entries.map((entry) => (entry.id === id ? applyCaptureReviewUpdate(entry, update) : entry));
+  const captures = current.captures.map((capture) => {
+    if (capture.id !== id) return capture;
+    found = true;
+    return {
+      ...capture,
+      summary: applyCaptureReviewUpdate(capture.summary, update)
+    };
+  });
+
+  if (!found) return undefined;
+
+  await writeSnapshotHistoryFile({ captures, entries }, env);
+  const detail = await readSnapshotCaptureDetail(id, env);
+  if (!detail) return undefined;
+
+  return {
+    ...detail,
+    entries
+  };
+}
+
 export async function clearSnapshotHistory(env: NodeJS.ProcessEnv = process.env) {
   await writeSnapshotHistoryFile({ captures: [], entries: [] }, env);
 }
@@ -146,6 +176,17 @@ function dedupeCaptures(captures: SnapshotCaptureRecord[]) {
     seen.add(capture.id);
     return true;
   });
+}
+
+function applyCaptureReviewUpdate(
+  entry: SnapshotHistoryEntry,
+  update: { reviewNote?: string; reviewedAt?: string }
+): SnapshotHistoryEntry {
+  return {
+    ...entry,
+    reviewNote: update.reviewNote,
+    reviewedAt: update.reviewedAt
+  };
 }
 
 function isSnapshotCaptureRecord(value: unknown): value is SnapshotCaptureRecord {

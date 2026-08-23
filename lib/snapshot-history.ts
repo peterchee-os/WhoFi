@@ -7,7 +7,9 @@ export type SnapshotHistoryEntry = {
   id: string;
   observedAt: string;
   onlineDevices: number;
+  reviewNote?: string;
   reviewSignals: number;
+  reviewedAt?: string;
   source: DeviceSource;
   topAp?: string;
   topLocation?: string;

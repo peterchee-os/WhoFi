@@ -615,6 +615,19 @@ textarea {
   font-size: 20px;
 }
 
+.capture-review-box {
+  margin: 0 18px 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.capture-review-box textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
 .comparison-grid {
   padding: 0 18px 14px;
   display: grid;
