@@ -280,6 +280,7 @@ const seededEmailDeliveries: EmailDelivery[] = [
 ];
 
 export default function Home() {
+  const snapshotArchiveImportRef = useRef<HTMLInputElement>(null);
   const snapshotReviewPolicyImportRef = useRef<HTMLInputElement>(null);
   const [activeView, setActiveView] = useState<View>("dashboard");
   const [query, setQuery] = useState("");
@@ -777,6 +778,62 @@ export default function Home() {
         testedAt: new Date().toISOString()
       });
       setNotice("Snapshot archive export failed");
+    }
+  };
+
+  const importSnapshotArchive = async (file?: File | null) => {
+    if (!file) return;
+
+    setSnapshotCaptureState({
+      message: "Importing archive",
+      status: "testing"
+    });
+
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      const response = await fetch("/api/snapshot-history/import", {
+        body: JSON.stringify(parsed),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const payload = (await response.json()) as {
+        captures?: SnapshotCaptureRecord[];
+        entries?: SnapshotHistoryEntry[];
+        error?: string;
+        importedCaptures?: number;
+        importedEntries?: number;
+      };
+      if (!response.ok || !Array.isArray(payload.entries)) {
+        throw new Error(payload.error ?? "Snapshot archive import failed");
+      }
+
+      setPersistedSnapshotCaptureIds((payload.captures ?? []).map((capture) => capture.id));
+      setSnapshotHistory(mergeSnapshotHistory(payload.entries).slice(0, 10));
+      setSelectedSnapshotComparison(undefined);
+      setSelectedSnapshotCapture(undefined);
+      setSelectedSnapshotCaptureId("");
+      setSnapshotReviewNoteDraft("");
+      setSnapshotCaptureState({
+        message: `Imported ${payload.importedCaptures ?? 0} captures`,
+        status: "success",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Snapshot archive imported");
+      addActivity(setActivity, "Imported snapshot archive");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Snapshot archive import failed";
+      setSnapshotCaptureState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Snapshot archive import failed");
+    } finally {
+      if (snapshotArchiveImportRef.current) {
+        snapshotArchiveImportRef.current.value = "";
+      }
     }
   };
 
@@ -1383,9 +1440,11 @@ export default function Home() {
             onExportSnapshotReviewPolicy={exportSnapshotReviewPolicy}
             onExportSnapshotReviewQueueReport={exportSnapshotReviewQueueReport}
             onExportSnapshotTrendReport={exportSnapshotTrendReport}
+            onImportSnapshotArchive={importSnapshotArchive}
             onImportSnapshotReviewPolicy={importSnapshotReviewPolicy}
             onLoadSnapshotCapture={loadSnapshotCapture}
             onMarkVisibleSnapshotQueueReviewed={markVisibleSnapshotQueueReviewed}
+            onOpenSnapshotArchiveImport={() => snapshotArchiveImportRef.current?.click()}
             onOpenSnapshotReviewPolicyImport={() => snapshotReviewPolicyImportRef.current?.click()}
             onResetSnapshotReviewPolicy={resetSnapshotReviewPolicy}
             onSnapshotReviewNoteChange={setSnapshotReviewNoteDraft}
@@ -1398,6 +1457,7 @@ export default function Home() {
             selectedSnapshotCapture={selectedSnapshotCapture}
             selectedSnapshotCaptureId={selectedSnapshotCaptureId}
             sessionSnapshot={sessionSnapshot}
+            snapshotArchiveImportRef={snapshotArchiveImportRef}
             snapshotCaptureState={snapshotCaptureState}
             snapshotHistory={snapshotHistory}
             snapshotReviewPolicy={snapshotReviewPolicy}
@@ -1678,9 +1738,11 @@ function UsageView({
   onExportSnapshotReviewPolicy,
   onExportSnapshotReviewQueueReport,
   onExportSnapshotTrendReport,
+  onImportSnapshotArchive,
   onImportSnapshotReviewPolicy,
   onLoadSnapshotCapture,
   onMarkVisibleSnapshotQueueReviewed,
+  onOpenSnapshotArchiveImport,
   onOpenSnapshotReviewPolicyImport,
   onResetSnapshotReviewPolicy,
   onSnapshotReviewNoteChange,
@@ -1693,6 +1755,7 @@ function UsageView({
   selectedSnapshotCapture,
   selectedSnapshotCaptureId,
   sessionSnapshot,
+  snapshotArchiveImportRef,
   snapshotCaptureState,
   snapshotHistory,
   snapshotReviewPolicy,
@@ -1711,9 +1774,11 @@ function UsageView({
     severityFilter: SnapshotReviewQueueSeverityFilter
   ) => void;
   onExportSnapshotTrendReport: (sourceFilter: SnapshotHistorySourceFilter) => void;
+  onImportSnapshotArchive: (file?: File | null) => void;
   onImportSnapshotReviewPolicy: (file?: File | null) => void;
   onLoadSnapshotCapture: (entryId: string) => void;
   onMarkVisibleSnapshotQueueReviewed: (ids: string[]) => void;
+  onOpenSnapshotArchiveImport: () => void;
   onOpenSnapshotReviewPolicyImport: () => void;
   onResetSnapshotReviewPolicy: () => void;
   onSnapshotReviewNoteChange: (value: string) => void;
@@ -1726,6 +1791,7 @@ function UsageView({
   selectedSnapshotCapture?: SnapshotCaptureRecord;
   selectedSnapshotCaptureId: string;
   sessionSnapshot: SessionSnapshot;
+  snapshotArchiveImportRef: RefObject<HTMLInputElement>;
   snapshotCaptureState: IntegrationTestState;
   snapshotHistory: SnapshotHistoryEntry[];
   snapshotReviewPolicy: SnapshotReviewPolicy;
@@ -1832,9 +1898,12 @@ function UsageView({
           entries={filteredSnapshotHistory}
           filter={historySourceFilter}
           filterCounts={snapshotHistoryCounts}
+          importInputRef={snapshotArchiveImportRef}
           onClear={onClearSnapshotHistory}
           onExportArchive={() => onExportSnapshotArchive(historySourceFilter)}
           onFilterChange={setHistorySourceFilter}
+          onImportArchive={onImportSnapshotArchive}
+          onImportArchiveClick={onOpenSnapshotArchiveImport}
           onLoadCapture={onLoadSnapshotCapture}
           persistedEntryIds={persistedSnapshotCaptureIds}
           selectedEntryId={selectedSnapshotCaptureId}
@@ -2393,9 +2462,12 @@ function SnapshotHistoryPanel({
   entries,
   filter,
   filterCounts,
+  importInputRef,
   onClear,
   onExportArchive,
   onFilterChange,
+  onImportArchive,
+  onImportArchiveClick,
   onLoadCapture,
   persistedEntryIds,
   selectedEntryId,
@@ -2404,9 +2476,12 @@ function SnapshotHistoryPanel({
   entries: SnapshotHistoryEntry[];
   filter: SnapshotHistorySourceFilter;
   filterCounts: Record<SnapshotHistorySourceFilter, number>;
+  importInputRef: RefObject<HTMLInputElement>;
   onClear: () => void;
   onExportArchive: () => void;
   onFilterChange: (filter: SnapshotHistorySourceFilter) => void;
+  onImportArchive: (file?: File | null) => void;
+  onImportArchiveClick: () => void;
   onLoadCapture: (entryId: string) => void;
   persistedEntryIds: string[];
   selectedEntryId: string;
@@ -2427,9 +2502,19 @@ function SnapshotHistoryPanel({
           <button className="text-button slim" disabled={entries.length === 0} onClick={onExportArchive}>
             Export Archive
           </button>
+          <button className="text-button slim" onClick={onImportArchiveClick}>
+            Import Archive
+          </button>
           <button className="text-button slim" disabled={totalCount === 0} onClick={onClear}>
             Clear
           </button>
+          <input
+            accept="application/json,.json"
+            className="hidden-file-input"
+            onChange={(event) => onImportArchive(event.target.files?.[0])}
+            ref={importInputRef}
+            type="file"
+          />
         </div>
       </div>
       <div className="source-filter" aria-label="Snapshot source filter">

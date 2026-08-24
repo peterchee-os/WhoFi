@@ -168,6 +168,44 @@ export async function deleteSnapshotCapture(
   };
 }
 
+export async function importSnapshotArchive(
+  archive: { captures?: unknown; entries?: unknown },
+  env: NodeJS.ProcessEnv = process.env
+): Promise<{ captures: SnapshotCaptureRecord[]; entries: SnapshotHistoryEntry[]; importedCaptures: number; importedEntries: number }> {
+  const importedCaptures = Array.isArray(archive.captures) ? archive.captures.filter(isSnapshotCaptureRecord) : [];
+  const importedEntries = Array.isArray(archive.entries) ? archive.entries.filter(isSnapshotHistoryEntry) : [];
+
+  if (importedCaptures.length === 0 && importedEntries.length === 0) {
+    return {
+      captures: await readSnapshotCaptures(env),
+      entries: await readSnapshotHistory(env),
+      importedCaptures: 0,
+      importedEntries: 0
+    };
+  }
+
+  const current = await readSnapshotHistoryFile(env);
+  const nextCaptures = dedupeCaptures([...importedCaptures, ...current.captures])
+    .sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime())
+    .slice(0, defaultCaptureLimit);
+  const nextEntries = dedupeHistoryEntries([
+    ...importedEntries,
+    ...importedCaptures.map((capture) => capture.summary),
+    ...current.entries
+  ])
+    .sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime())
+    .slice(0, defaultHistoryLimit);
+
+  await writeSnapshotHistoryFile({ captures: nextCaptures, entries: nextEntries }, env);
+
+  return {
+    captures: nextCaptures,
+    entries: nextEntries,
+    importedCaptures: importedCaptures.length,
+    importedEntries: importedEntries.length
+  };
+}
+
 async function readSnapshotHistoryFile(env: NodeJS.ProcessEnv): Promise<SnapshotHistoryFile> {
   try {
     const raw = await readFile(/* turbopackIgnore: true */ getSnapshotHistoryPath(env), "utf8");
