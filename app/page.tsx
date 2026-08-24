@@ -625,6 +625,59 @@ export default function Home() {
     }
   };
 
+  const pruneSnapshotHistory = async () => {
+    setSnapshotCaptureState({
+      message: "Pruning history",
+      status: "testing"
+    });
+
+    try {
+      const response = await fetch("/api/snapshot-history", {
+        body: JSON.stringify({ action: "prune" }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "PATCH"
+      });
+      const payload = (await response.json()) as {
+        captures?: SnapshotCaptureRecord[];
+        entries?: SnapshotHistoryEntry[];
+        error?: string;
+        limits?: unknown;
+        prunedCaptures?: number;
+        prunedEntries?: number;
+      };
+      if (!response.ok || !Array.isArray(payload.entries)) {
+        throw new Error(payload.error ?? "History prune failed");
+      }
+
+      if (isSnapshotStorageLimits(payload.limits)) {
+        setSnapshotStorageLimits(payload.limits);
+      }
+      setPersistedSnapshotCaptureIds((payload.captures ?? []).map((capture) => capture.id));
+      setSnapshotHistory(mergeSnapshotHistory(payload.entries).slice(0, 10));
+      setSelectedSnapshotComparison(undefined);
+      setSelectedSnapshotCapture(undefined);
+      setSelectedSnapshotCaptureId("");
+      setSnapshotReviewNoteDraft("");
+      setSnapshotCaptureState({
+        message: `Pruned ${payload.prunedCaptures ?? 0} captures`,
+        status: "success",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Snapshot history pruned");
+      addActivity(setActivity, "Pruned snapshot history");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "History prune failed";
+      setSnapshotCaptureState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("History prune failed");
+    }
+  };
+
   const deleteSelectedSnapshotCapture = async () => {
     if (!selectedSnapshotCaptureId) return;
 
@@ -1469,6 +1522,7 @@ export default function Home() {
             onMarkVisibleSnapshotQueueReviewed={markVisibleSnapshotQueueReviewed}
             onOpenSnapshotArchiveImport={() => snapshotArchiveImportRef.current?.click()}
             onOpenSnapshotReviewPolicyImport={() => snapshotReviewPolicyImportRef.current?.click()}
+            onPruneSnapshotHistory={pruneSnapshotHistory}
             onResetSnapshotReviewPolicy={resetSnapshotReviewPolicy}
             onSnapshotReviewNoteChange={setSnapshotReviewNoteDraft}
             onUpdateSnapshotReview={updateSelectedSnapshotReview}
@@ -1768,6 +1822,7 @@ function UsageView({
   onMarkVisibleSnapshotQueueReviewed,
   onOpenSnapshotArchiveImport,
   onOpenSnapshotReviewPolicyImport,
+  onPruneSnapshotHistory,
   onResetSnapshotReviewPolicy,
   onSnapshotReviewNoteChange,
   onUpdateSnapshotReview,
@@ -1805,6 +1860,7 @@ function UsageView({
   onMarkVisibleSnapshotQueueReviewed: (ids: string[]) => void;
   onOpenSnapshotArchiveImport: () => void;
   onOpenSnapshotReviewPolicyImport: () => void;
+  onPruneSnapshotHistory: () => void;
   onResetSnapshotReviewPolicy: () => void;
   onSnapshotReviewNoteChange: (value: string) => void;
   onUpdateSnapshotReview: (reviewed?: boolean) => void;
@@ -1932,6 +1988,7 @@ function UsageView({
           onImportArchiveClick={onOpenSnapshotArchiveImport}
           onLoadCapture={onLoadSnapshotCapture}
           persistedEntryIds={persistedSnapshotCaptureIds}
+          onPrune={onPruneSnapshotHistory}
           selectedEntryId={selectedSnapshotCaptureId}
           storageLimits={snapshotStorageLimits}
           totalCount={snapshotHistory.length}
@@ -2497,6 +2554,7 @@ function SnapshotHistoryPanel({
   onImportArchiveClick,
   onLoadCapture,
   persistedEntryIds,
+  onPrune,
   selectedEntryId,
   storageLimits,
   totalCount
@@ -2512,6 +2570,7 @@ function SnapshotHistoryPanel({
   onImportArchiveClick: () => void;
   onLoadCapture: (entryId: string) => void;
   persistedEntryIds: string[];
+  onPrune: () => void;
   selectedEntryId: string;
   storageLimits: SnapshotStorageLimits;
   totalCount: number;
@@ -2534,6 +2593,9 @@ function SnapshotHistoryPanel({
           </button>
           <button className="text-button slim" onClick={onImportArchiveClick}>
             Import Archive
+          </button>
+          <button className="text-button slim" disabled={totalCount === 0} onClick={onPrune}>
+            Prune
           </button>
           <button className="text-button slim" disabled={totalCount === 0} onClick={onClear}>
             Clear

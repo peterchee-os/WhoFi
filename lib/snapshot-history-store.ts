@@ -153,6 +153,28 @@ export async function clearSnapshotHistory(env: NodeJS.ProcessEnv = process.env)
   await writeSnapshotHistoryFile({ captures: [], entries: [] }, env);
 }
 
+export async function pruneSnapshotHistory(
+  env: NodeJS.ProcessEnv = process.env
+): Promise<{ captures: SnapshotCaptureRecord[]; entries: SnapshotHistoryEntry[]; prunedCaptures: number; prunedEntries: number }> {
+  const current = await readSnapshotHistoryFile(env);
+  const limits = getSnapshotHistoryLimits(env);
+  const captures = dedupeCaptures(current.captures)
+    .sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime())
+    .slice(0, limits.captureLimit);
+  const entries = dedupeHistoryEntries(current.entries)
+    .sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime())
+    .slice(0, limits.historyLimit);
+
+  await writeSnapshotHistoryFile({ captures, entries }, env);
+
+  return {
+    captures,
+    entries,
+    prunedCaptures: Math.max(0, current.captures.length - captures.length),
+    prunedEntries: Math.max(0, current.entries.length - entries.length)
+  };
+}
+
 export async function deleteSnapshotCapture(
   id: string,
   env: NodeJS.ProcessEnv = process.env

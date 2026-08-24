@@ -3,6 +3,7 @@ import { getAdminAuthStatus } from "@/lib/admin-auth";
 import {
   clearSnapshotHistory,
   getSnapshotHistoryLimits,
+  pruneSnapshotHistory,
   readSnapshotCaptures,
   readSnapshotHistory
 } from "@/lib/snapshot-history-store";
@@ -48,6 +49,39 @@ export async function DELETE(request: NextRequest) {
   await clearSnapshotHistory();
   return NextResponse.json({
     entries: [],
+    limits: getSnapshotHistoryLimits()
+  });
+}
+
+export async function PATCH(request: NextRequest) {
+  const adminStatus = getAdminAuthStatus(request);
+  if (!adminStatus.authenticated) {
+    return NextResponse.json(
+      {
+        error: "Admin authentication required"
+      },
+      {
+        status: adminStatus.configured ? 401 : 503
+      }
+    );
+  }
+
+  const body = (await request.json().catch(() => undefined)) as { action?: unknown } | undefined;
+  if (body?.action !== "prune") {
+    return NextResponse.json(
+      {
+        error: "Invalid snapshot history action"
+      },
+      {
+        status: 400
+      }
+    );
+  }
+
+  const result = await pruneSnapshotHistory();
+
+  return NextResponse.json({
+    ...result,
     limits: getSnapshotHistoryLimits()
   });
 }
