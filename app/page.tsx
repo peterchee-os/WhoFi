@@ -33,9 +33,11 @@ import {
   buildSnapshotReviewQueue,
   buildSnapshotReviewQueueSummary,
   createSnapshotHistoryEntry,
+  defaultSnapshotReviewPolicy,
   type SnapshotCaptureComparison,
   type SnapshotCaptureRecord,
   type SnapshotHistoryEntry,
+  type SnapshotReviewPolicy,
   type SnapshotReviewQueueItem,
   type SnapshotReviewQueueSummary
 } from "@/lib/snapshot-history";
@@ -288,6 +290,11 @@ export default function Home() {
   const [selectedSnapshotCaptureId, setSelectedSnapshotCaptureId] = useState("");
   const [snapshotReviewNoteDraft, setSnapshotReviewNoteDraft] = useState("");
   const [persistedSnapshotCaptureIds, setPersistedSnapshotCaptureIds] = useState<string[]>([]);
+  const [snapshotReviewPolicy, setSnapshotReviewPolicy] = useState<SnapshotReviewPolicy>(defaultSnapshotReviewPolicy);
+  const [snapshotReviewPolicyState, setSnapshotReviewPolicyState] = useState<IntegrationTestState>({
+    message: "Default policy",
+    status: "idle"
+  });
   const [reviewQueueUpdating, setReviewQueueUpdating] = useState(false);
   const [snapshotCaptureState, setSnapshotCaptureState] = useState<IntegrationTestState>({
     message: "No capture selected",
@@ -477,6 +484,39 @@ export default function Home() {
           : current);
       })
       .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adminAuth.authenticated, adminAuth.enabled, adminAuth.loaded]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!adminAuth.loaded || (adminAuth.enabled && !adminAuth.authenticated)) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    fetch("/api/snapshot-history/review-policy")
+      .then((response) => response.json())
+      .then((payload) => {
+        if (cancelled || !payload.policy) return;
+        setSnapshotReviewPolicy(payload.policy as SnapshotReviewPolicy);
+        setSnapshotReviewPolicyState({
+          message: "Policy loaded",
+          status: "success",
+          testedAt: new Date().toISOString()
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSnapshotReviewPolicyState({
+          message: "Using default policy",
+          status: "idle"
+        });
+      });
 
     return () => {
       cancelled = true;
@@ -679,6 +719,48 @@ export default function Home() {
         testedAt: new Date().toISOString()
       });
       setNotice("Queue report export failed");
+    }
+  };
+
+  const updateSnapshotReviewPolicy = async (policy: SnapshotReviewPolicy) => {
+    setSnapshotReviewPolicy(policy);
+    setSnapshotReviewPolicyState({
+      message: "Saving policy",
+      status: "testing"
+    });
+
+    try {
+      const response = await fetch("/api/snapshot-history/review-policy", {
+        body: JSON.stringify(policy),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "PATCH"
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        policy?: SnapshotReviewPolicy;
+      };
+      if (!response.ok || !payload.policy) {
+        throw new Error(payload.error ?? "Review policy save failed");
+      }
+
+      setSnapshotReviewPolicy(payload.policy);
+      setSnapshotReviewPolicyState({
+        message: "Policy saved",
+        status: "success",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Review policy saved");
+      addActivity(setActivity, "Updated snapshot review policy");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Review policy save failed";
+      setSnapshotReviewPolicyState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Review policy save failed");
     }
   };
 
@@ -1157,6 +1239,7 @@ export default function Home() {
             onMarkVisibleSnapshotQueueReviewed={markVisibleSnapshotQueueReviewed}
             onSnapshotReviewNoteChange={setSnapshotReviewNoteDraft}
             onUpdateSnapshotReview={updateSelectedSnapshotReview}
+            onUpdateSnapshotReviewPolicy={updateSnapshotReviewPolicy}
             onUseSelectedSnapshotCapture={useSelectedSnapshotCapture}
             persistedSnapshotCaptureIds={persistedSnapshotCaptureIds}
             reviewQueueUpdating={reviewQueueUpdating}
@@ -1166,6 +1249,8 @@ export default function Home() {
             sessionSnapshot={sessionSnapshot}
             snapshotCaptureState={snapshotCaptureState}
             snapshotHistory={snapshotHistory}
+            snapshotReviewPolicy={snapshotReviewPolicy}
+            snapshotReviewPolicyState={snapshotReviewPolicyState}
             snapshotReviewNoteDraft={snapshotReviewNoteDraft}
           />
         ) : null}
@@ -1442,6 +1527,7 @@ function UsageView({
   onMarkVisibleSnapshotQueueReviewed,
   onSnapshotReviewNoteChange,
   onUpdateSnapshotReview,
+  onUpdateSnapshotReviewPolicy,
   onUseSelectedSnapshotCapture,
   persistedSnapshotCaptureIds,
   reviewQueueUpdating,
@@ -1451,6 +1537,8 @@ function UsageView({
   sessionSnapshot,
   snapshotCaptureState,
   snapshotHistory,
+  snapshotReviewPolicy,
+  snapshotReviewPolicyState,
   snapshotReviewNoteDraft
 }: {
   onClearSnapshotHistory: () => void;
@@ -1465,6 +1553,7 @@ function UsageView({
   onMarkVisibleSnapshotQueueReviewed: (ids: string[]) => void;
   onSnapshotReviewNoteChange: (value: string) => void;
   onUpdateSnapshotReview: (reviewed?: boolean) => void;
+  onUpdateSnapshotReviewPolicy: (policy: SnapshotReviewPolicy) => void;
   onUseSelectedSnapshotCapture: () => void;
   persistedSnapshotCaptureIds: string[];
   reviewQueueUpdating: boolean;
@@ -1474,6 +1563,8 @@ function UsageView({
   sessionSnapshot: SessionSnapshot;
   snapshotCaptureState: IntegrationTestState;
   snapshotHistory: SnapshotHistoryEntry[];
+  snapshotReviewPolicy: SnapshotReviewPolicy;
+  snapshotReviewPolicyState: IntegrationTestState;
   snapshotReviewNoteDraft: string;
 }) {
   const [historySourceFilter, setHistorySourceFilter] = useState<SnapshotHistorySourceFilter>("all");
@@ -1488,7 +1579,10 @@ function UsageView({
     [historySourceFilter, snapshotHistory]
   );
   const snapshotHistoryCounts = useMemo(() => getSnapshotHistoryCounts(snapshotHistory), [snapshotHistory]);
-  const snapshotReviewQueue = useMemo(() => buildSnapshotReviewQueue(snapshotHistory), [snapshotHistory]);
+  const snapshotReviewQueue = useMemo(
+    () => buildSnapshotReviewQueue(snapshotHistory, snapshotReviewPolicy),
+    [snapshotHistory, snapshotReviewPolicy]
+  );
   const filteredSnapshotReviewQueue = useMemo(
     () =>
       snapshotReviewQueue.filter((item) => {
@@ -1551,6 +1645,12 @@ function UsageView({
           sourceFilter={reviewQueueSourceFilter}
           summary={snapshotReviewQueueSummary}
           updating={reviewQueueUpdating}
+        />
+
+        <SnapshotReviewPolicyPanel
+          onChange={onUpdateSnapshotReviewPolicy}
+          policy={snapshotReviewPolicy}
+          state={snapshotReviewPolicyState}
         />
 
         <SnapshotHistoryPanel
@@ -1918,6 +2018,93 @@ function SnapshotReviewQueuePanel({
             <p>No open capture reviews match these filters.</p>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function SnapshotReviewPolicyPanel({
+  onChange,
+  policy,
+  state
+}: {
+  onChange: (policy: SnapshotReviewPolicy) => void;
+  policy: SnapshotReviewPolicy;
+  state: IntegrationTestState;
+}) {
+  const updatePolicy = (patch: Partial<SnapshotReviewPolicy>) => {
+    onChange({
+      ...policy,
+      ...patch
+    });
+  };
+  const highUsageGb = Math.max(0, Math.round(policy.highUsageBytes / 1024 ** 3));
+
+  return (
+    <div className="panel">
+      <div className="panel-header">
+        <div>
+          <h3>Review Policy</h3>
+          <p>{state.message}</p>
+        </div>
+        <span className={`integration-state ${state.status}`}>
+          {state.status === "success" ? "Saved" : state.status === "error" ? "Error" : "Ready"}
+        </span>
+      </div>
+      <div className="policy-form">
+        <label className="toggle-row">
+          <input
+            checked={policy.triggerOnUnknownDevices}
+            onChange={(event) => updatePolicy({ triggerOnUnknownDevices: event.target.checked })}
+            type="checkbox"
+          />
+          <strong>Unknown devices</strong>
+        </label>
+        <label className="select-field">
+          <span>Unknown threshold</span>
+          <input
+            min={1}
+            onChange={(event) => updatePolicy({ unknownDeviceThreshold: Number(event.target.value) })}
+            type="number"
+            value={policy.unknownDeviceThreshold}
+          />
+        </label>
+
+        <label className="toggle-row">
+          <input
+            checked={policy.triggerOnReviewSignals}
+            onChange={(event) => updatePolicy({ triggerOnReviewSignals: event.target.checked })}
+            type="checkbox"
+          />
+          <strong>Review signals</strong>
+        </label>
+        <label className="select-field">
+          <span>Signal threshold</span>
+          <input
+            min={1}
+            onChange={(event) => updatePolicy({ reviewSignalThreshold: Number(event.target.value) })}
+            type="number"
+            value={policy.reviewSignalThreshold}
+          />
+        </label>
+
+        <label className="toggle-row">
+          <input
+            checked={policy.triggerOnHighUsage}
+            onChange={(event) => updatePolicy({ triggerOnHighUsage: event.target.checked })}
+            type="checkbox"
+          />
+          <strong>High usage</strong>
+        </label>
+        <label className="select-field">
+          <span>Usage threshold GB</span>
+          <input
+            min={0}
+            onChange={(event) => updatePolicy({ highUsageBytes: Number(event.target.value) * 1024 ** 3 })}
+            type="number"
+            value={highUsageGb}
+          />
+        </label>
       </div>
     </div>
   );

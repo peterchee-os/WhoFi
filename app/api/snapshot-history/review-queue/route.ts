@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuthStatus } from "@/lib/admin-auth";
 import { buildSnapshotReviewQueue, buildSnapshotReviewQueueSummary } from "@/lib/snapshot-history";
+import { readSnapshotReviewPolicy } from "@/lib/snapshot-review-policy-store";
 import { readSnapshotHistory, updateSnapshotCaptureReviews } from "@/lib/snapshot-history-store";
 
 export const runtime = "nodejs";
@@ -18,11 +19,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const entries = await readSnapshotHistory();
-  const queue = buildSnapshotReviewQueue(entries);
+  const [entries, policy] = await Promise.all([readSnapshotHistory(), readSnapshotReviewPolicy()]);
+  const queue = buildSnapshotReviewQueue(entries, policy);
 
   return NextResponse.json({
     count: queue.length,
+    policy,
     queue,
     summary: buildSnapshotReviewQueueSummary(entries, queue)
   });
@@ -60,11 +62,13 @@ export async function PATCH(request: NextRequest) {
   const result = await updateSnapshotCaptureReviews(ids, {
     reviewedAt: body.reviewed ? new Date().toISOString() : undefined
   });
-  const queue = buildSnapshotReviewQueue(result.entries);
+  const policy = await readSnapshotReviewPolicy();
+  const queue = buildSnapshotReviewQueue(result.entries, policy);
 
   return NextResponse.json({
     count: queue.length,
     entries: result.entries,
+    policy,
     queue,
     summary: buildSnapshotReviewQueueSummary(result.entries, queue),
     updatedIds: result.updatedIds

@@ -14,8 +14,9 @@ Latest completed slices:
 - search across device, owner, profile, and network fields
 - device inspection panel
 - dashboard source switcher for Demo, Omada, and optional Omada Printing Press CLI snapshots
-- Usage view with current snapshot totals, source-filtered recent history, open capture review queue with workload counts, stored capture detail, selected-capture JSON/Markdown export, stored-capture replay, review notes, reviewed state, single-capture deletion, previous-capture deltas, new/missing device movement, generated review-signal hints, and rollups by location, SSID, and AP
+- Usage view with current snapshot totals, source-filtered recent history, tunable review policy thresholds, open capture review queue with workload counts, stored capture detail, selected-capture JSON/Markdown export, stored-capture replay, review notes, reviewed state, single-capture deletion, previous-capture deltas, new/missing device movement, generated review-signal hints, and rollups by location, SSID, and AP
 - local file-backed snapshot audit history at `.whofi/snapshot-history.json`, with bounded full captures and `WHOFI_SNAPSHOT_HISTORY_PATH` override
+- local file-backed snapshot review policy at `.whofi/snapshot-review-policy.json`, with `WHOFI_SNAPSHOT_REVIEW_POLICY_PATH` override
 - local review actions: assign, reviewed, watch, block
 - local alert actions: acknowledge, resolve
 - localStorage persistence for demo review state
@@ -28,6 +29,7 @@ Latest completed slices:
 - `/api/sessions` endpoint with the same source, gate, and token behavior as `/api/devices`
 - `POST /api/snapshot-history/capture` endpoint for write/capture semantics; `/api/devices` remains read-only
 - `GET /api/snapshot-history/review-queue` endpoint for open stored capture reviews and queue summary counts
+- `GET/PATCH /api/snapshot-history/review-policy` endpoint for local review queue threshold policy
 - `GET /api/snapshot-history/review-queue/report` endpoint for filtered Markdown queue handoff reports
 - `PATCH /api/snapshot-history/review-queue` endpoint for bulk marking selected review queue captures reviewed/open without clearing review notes
 - `PATCH /api/snapshot-history/{id}` endpoint for review notes and reviewed/open state on stored captures

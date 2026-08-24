@@ -77,15 +77,36 @@ export type SnapshotReviewQueueSummary = {
   watch: number;
 };
 
-export function buildSnapshotReviewQueue(entries: SnapshotHistoryEntry[]): SnapshotReviewQueueItem[] {
+export type SnapshotReviewPolicy = {
+  highUsageBytes: number;
+  reviewSignalThreshold: number;
+  triggerOnHighUsage: boolean;
+  triggerOnReviewSignals: boolean;
+  triggerOnUnknownDevices: boolean;
+  unknownDeviceThreshold: number;
+};
+
+export const defaultSnapshotReviewPolicy: SnapshotReviewPolicy = {
+  highUsageBytes: 50 * 1024 ** 3,
+  reviewSignalThreshold: 1,
+  triggerOnHighUsage: false,
+  triggerOnReviewSignals: true,
+  triggerOnUnknownDevices: true,
+  unknownDeviceThreshold: 1
+};
+
+export function buildSnapshotReviewQueue(
+  entries: SnapshotHistoryEntry[],
+  policy: SnapshotReviewPolicy = defaultSnapshotReviewPolicy
+): SnapshotReviewQueueItem[] {
   return entries
-    .filter((entry) => !entry.reviewedAt && (entry.reviewSignals > 0 || entry.unknownDevices > 0))
+    .filter((entry) => !entry.reviewedAt && getReviewQueueReasons(entry, policy).length > 0)
     .map((entry) => ({
       id: entry.id,
       observedAt: entry.observedAt,
-      reason: getReviewQueueReason(entry),
+      reason: getReviewQueueReasons(entry, policy).join(", "),
       reviewNote: entry.reviewNote,
-      severity: entry.reviewSignals > 0 ? ("warning" as const) : ("watch" as const),
+      severity: getReviewQueueSeverity(entry, policy),
       source: entry.source,
       unknownDevices: entry.unknownDevices
     }))
@@ -130,12 +151,54 @@ export function buildSnapshotCaptureComparison(
   };
 }
 
-function getReviewQueueReason(entry: SnapshotHistoryEntry) {
-  if (entry.reviewSignals > 0 && entry.unknownDevices > 0) {
-    return `${entry.reviewSignals} review signals, ${entry.unknownDevices} unknown devices`;
+export function normalizeSnapshotReviewPolicy(value: Partial<SnapshotReviewPolicy> = {}): SnapshotReviewPolicy {
+  return {
+    highUsageBytes: normalizeInteger(value.highUsageBytes, defaultSnapshotReviewPolicy.highUsageBytes),
+    reviewSignalThreshold: normalizeInteger(value.reviewSignalThreshold, defaultSnapshotReviewPolicy.reviewSignalThreshold, 1),
+    triggerOnHighUsage: typeof value.triggerOnHighUsage === "boolean" ? value.triggerOnHighUsage : defaultSnapshotReviewPolicy.triggerOnHighUsage,
+    triggerOnReviewSignals:
+      typeof value.triggerOnReviewSignals === "boolean" ? value.triggerOnReviewSignals : defaultSnapshotReviewPolicy.triggerOnReviewSignals,
+    triggerOnUnknownDevices:
+      typeof value.triggerOnUnknownDevices === "boolean" ? value.triggerOnUnknownDevices : defaultSnapshotReviewPolicy.triggerOnUnknownDevices,
+    unknownDeviceThreshold: normalizeInteger(value.unknownDeviceThreshold, defaultSnapshotReviewPolicy.unknownDeviceThreshold, 1)
+  };
+}
+
+function getReviewQueueReasons(entry: SnapshotHistoryEntry, policy: SnapshotReviewPolicy) {
+  const reasons: string[] = [];
+
+  if (policy.triggerOnReviewSignals && entry.reviewSignals >= policy.reviewSignalThreshold) {
+    reasons.push(`${entry.reviewSignals} review ${pluralize("signal", entry.reviewSignals)}`);
   }
-  if (entry.reviewSignals > 0) return `${entry.reviewSignals} review signals`;
-  return `${entry.unknownDevices} unknown devices`;
+
+  if (policy.triggerOnUnknownDevices && entry.unknownDevices >= policy.unknownDeviceThreshold) {
+    reasons.push(`${entry.unknownDevices} unknown ${pluralize("device", entry.unknownDevices)}`);
+  }
+
+  if (policy.triggerOnHighUsage && entry.totalBytes >= policy.highUsageBytes) {
+    reasons.push(`${formatPolicyBytes(entry.totalBytes)} usage`);
+  }
+
+  return reasons;
+}
+
+function getReviewQueueSeverity(entry: SnapshotHistoryEntry, policy: SnapshotReviewPolicy): SnapshotReviewQueueItem["severity"] {
+  if (policy.triggerOnReviewSignals && entry.reviewSignals >= policy.reviewSignalThreshold) return "warning";
+  if (policy.triggerOnUnknownDevices && entry.unknownDevices >= policy.unknownDeviceThreshold && entry.reviewSignals > 0) {
+    return "warning";
+  }
+  return "watch";
+}
+
+function normalizeInteger(value: unknown, fallback: number, min = 0) {
+  return typeof value === "number" && Number.isFinite(value) && value >= min ? Math.floor(value) : fallback;
+}
+
+function formatPolicyBytes(value: number) {
+  if (value >= 1024 ** 3) return `${Math.round(value / 1024 ** 3)} GB`;
+  if (value >= 1024 ** 2) return `${Math.round(value / 1024 ** 2)} MB`;
+  if (value >= 1024) return `${Math.round(value / 1024)} KB`;
+  return `${value} B`;
 }
 
 function getNewDevices(current: SnapshotCaptureRecord, previous: SnapshotCaptureRecord) {

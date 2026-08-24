@@ -892,6 +892,18 @@ textarea {
   font-size: 12px;
 }
 
+.policy-form {
+  padding: 0 18px 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 12px;
+  align-items: center;
+}
+
+.policy-form .select-field input {
+  min-height: 34px;
+}
+
 .snapshot-history-row p:last-child {
   font-size: 12px;
 }

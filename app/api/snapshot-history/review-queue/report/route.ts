@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuthStatus } from "@/lib/admin-auth";
 import { buildSnapshotReviewQueue } from "@/lib/snapshot-history";
 import { buildSnapshotReviewQueueReport } from "@/lib/snapshot-report";
+import { readSnapshotReviewPolicy } from "@/lib/snapshot-review-policy-store";
 import { readSnapshotHistory } from "@/lib/snapshot-history-store";
 import type { DeviceSource } from "@/lib/device-ledger";
 import type { SnapshotReviewQueueItem } from "@/lib/snapshot-history";
@@ -40,8 +41,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const entries = await readSnapshotHistory();
-  const allQueue = buildSnapshotReviewQueue(entries);
+  const [entries, policy] = await Promise.all([readSnapshotHistory(), readSnapshotReviewPolicy()]);
+  const allQueue = buildSnapshotReviewQueue(entries, policy);
   const queue = allQueue.filter((item) => {
     const sourceMatch = source === "all" || item.source === source;
     const severityMatch = severity === "all" || item.severity === severity;
