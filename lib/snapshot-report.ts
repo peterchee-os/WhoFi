@@ -1,5 +1,12 @@
 import { formatBytes } from "./format";
-import type { SnapshotCaptureComparison, SnapshotCaptureRecord, SnapshotDeviceChange, SnapshotReviewSignal } from "./snapshot-history";
+import type {
+  SnapshotCaptureComparison,
+  SnapshotCaptureRecord,
+  SnapshotDeviceChange,
+  SnapshotReviewQueueItem,
+  SnapshotReviewQueueSummary,
+  SnapshotReviewSignal
+} from "./snapshot-history";
 import type { Device } from "./types";
 
 export function buildSnapshotCaptureReport({
@@ -50,6 +57,42 @@ export function buildSnapshotCaptureReport({
   return `${lines.join("\n")}\n`;
 }
 
+export function buildSnapshotReviewQueueReport({
+  generatedAt = new Date().toISOString(),
+  queue,
+  severityFilter,
+  sourceFilter,
+  summary
+}: {
+  generatedAt?: string;
+  queue: SnapshotReviewQueueItem[];
+  severityFilter: string;
+  sourceFilter: string;
+  summary: SnapshotReviewQueueSummary;
+}) {
+  const lines = [
+    "# WhoFi Snapshot Review Queue",
+    "",
+    `Generated At: ${generatedAt}`,
+    `Source Filter: ${sourceFilter}`,
+    `Severity Filter: ${severityFilter}`,
+    "",
+    "## Workload",
+    "",
+    `- Open: ${summary.open}`,
+    `- Warning: ${summary.warning}`,
+    `- Watch: ${summary.watch}`,
+    `- Reviewed: ${summary.reviewed}`,
+    `- Total stored captures: ${summary.total}`,
+    "",
+    "## Open Reviews",
+    "",
+    ...formatQueueItems(queue)
+  ];
+
+  return `${lines.join("\n")}\n`;
+}
+
 function formatComparison(comparison?: SnapshotCaptureComparison) {
   if (!comparison) return ["No previous same-source capture was available."];
 
@@ -66,6 +109,24 @@ function formatComparison(comparison?: SnapshotCaptureComparison) {
 function formatReviewSignals(signals: SnapshotReviewSignal[]) {
   if (!signals.length) return ["No generated review signals."];
   return signals.map((signal) => `- ${signal.label} (${signal.severity}): ${signal.detail}`);
+}
+
+function formatQueueItems(items: SnapshotReviewQueueItem[]) {
+  if (!items.length) return ["No open capture reviews match these filters."];
+
+  return items.map((item) =>
+    [
+      `- ${item.id}`,
+      `  - Source: ${item.source}`,
+      `  - Severity: ${item.severity}`,
+      `  - Observed at: ${item.observedAt}`,
+      `  - Unknown devices: ${item.unknownDevices}`,
+      `  - Reason: ${item.reason}`,
+      item.reviewNote ? `  - Review note: ${item.reviewNote}` : undefined
+    ]
+      .filter((line): line is string => line !== undefined)
+      .join("\n")
+  );
 }
 
 function formatDeviceChanges(devices: SnapshotDeviceChange[]) {

@@ -371,6 +371,18 @@ textarea {
   opacity: 0.5;
 }
 
+.button-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.button-row.compact-actions {
+  max-width: 260px;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

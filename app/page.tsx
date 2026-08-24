@@ -650,6 +650,38 @@ export default function Home() {
     }
   };
 
+  const exportSnapshotReviewQueueReport = async (
+    sourceFilter: SnapshotHistorySourceFilter,
+    severityFilter: SnapshotReviewQueueSeverityFilter
+  ) => {
+    try {
+      const params = new URLSearchParams({
+        severity: severityFilter,
+        source: sourceFilter
+      });
+      const response = await fetch(`/api/snapshot-history/review-queue/report?${params.toString()}`);
+      if (!response.ok) throw new Error("Review queue report export failed");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `whofi-review-queue-${sourceFilter}-${severityFilter}.md`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setNotice("Queue report exported");
+      addActivity(setActivity, "Exported snapshot review queue report");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Review queue report export failed";
+      setSnapshotCaptureState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Queue report export failed");
+    }
+  };
+
   const useSelectedSnapshotCapture = () => {
     if (!selectedSnapshotCapture) return;
     const snapshot = selectedSnapshotCapture.deviceSnapshot;
@@ -1120,6 +1152,7 @@ export default function Home() {
             onDeleteSelectedSnapshotCapture={deleteSelectedSnapshotCapture}
             onExportSelectedSnapshotCapture={exportSelectedSnapshotCapture}
             onExportSelectedSnapshotReport={exportSelectedSnapshotReport}
+            onExportSnapshotReviewQueueReport={exportSnapshotReviewQueueReport}
             onLoadSnapshotCapture={loadSnapshotCapture}
             onMarkVisibleSnapshotQueueReviewed={markVisibleSnapshotQueueReviewed}
             onSnapshotReviewNoteChange={setSnapshotReviewNoteDraft}
@@ -1404,6 +1437,7 @@ function UsageView({
   onDeleteSelectedSnapshotCapture,
   onExportSelectedSnapshotCapture,
   onExportSelectedSnapshotReport,
+  onExportSnapshotReviewQueueReport,
   onLoadSnapshotCapture,
   onMarkVisibleSnapshotQueueReviewed,
   onSnapshotReviewNoteChange,
@@ -1423,6 +1457,10 @@ function UsageView({
   onDeleteSelectedSnapshotCapture: () => void;
   onExportSelectedSnapshotCapture: () => void;
   onExportSelectedSnapshotReport: () => void;
+  onExportSnapshotReviewQueueReport: (
+    sourceFilter: SnapshotHistorySourceFilter,
+    severityFilter: SnapshotReviewQueueSeverityFilter
+  ) => void;
   onLoadSnapshotCapture: (entryId: string) => void;
   onMarkVisibleSnapshotQueueReviewed: (ids: string[]) => void;
   onSnapshotReviewNoteChange: (value: string) => void;
@@ -1503,6 +1541,7 @@ function UsageView({
         <SnapshotReviewQueuePanel
           filterCounts={snapshotReviewQueueFilterCounts}
           items={filteredSnapshotReviewQueue}
+          onExportReport={() => onExportSnapshotReviewQueueReport(reviewQueueSourceFilter, reviewQueueSeverityFilter)}
           onMarkVisibleReviewed={() => onMarkVisibleSnapshotQueueReviewed(filteredSnapshotReviewQueue.slice(0, 5).map((item) => item.id))}
           onLoadCapture={onLoadSnapshotCapture}
           onSeverityFilterChange={setReviewQueueSeverityFilter}
@@ -1755,6 +1794,7 @@ function SnapshotCapturePanel({
 function SnapshotReviewQueuePanel({
   filterCounts,
   items,
+  onExportReport,
   onMarkVisibleReviewed,
   onLoadCapture,
   onSeverityFilterChange,
@@ -1770,6 +1810,7 @@ function SnapshotReviewQueuePanel({
     severity: Record<SnapshotReviewQueueSeverityFilter, number>;
   };
   items: SnapshotReviewQueueItem[];
+  onExportReport: () => void;
   onMarkVisibleReviewed: () => void;
   onLoadCapture: (entryId: string) => void;
   onSeverityFilterChange: (filter: SnapshotReviewQueueSeverityFilter) => void;
@@ -1791,14 +1832,24 @@ function SnapshotReviewQueuePanel({
           <h3>Capture Review Queue</h3>
           <p>{items.length} visible of {summary.open} open capture reviews.</p>
         </div>
-        <button
-          className="text-button slim"
-          disabled={visibleItems.length === 0 || updating}
-          onClick={onMarkVisibleReviewed}
-          type="button"
-        >
-          {updating ? "Reviewing" : "Mark Visible Reviewed"}
-        </button>
+        <div className="button-row compact-actions">
+          <button
+            className="text-button slim"
+            disabled={items.length === 0}
+            onClick={onExportReport}
+            type="button"
+          >
+            Queue Report
+          </button>
+          <button
+            className="text-button slim"
+            disabled={visibleItems.length === 0 || updating}
+            onClick={onMarkVisibleReviewed}
+            type="button"
+          >
+            {updating ? "Reviewing" : "Mark Visible Reviewed"}
+          </button>
+        </div>
       </div>
       <div className="review-queue-summary">
         <div>
