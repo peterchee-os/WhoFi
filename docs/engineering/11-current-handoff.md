@@ -13,6 +13,7 @@ Latest completed slices:
 - functional navigation: Dashboard, Devices, Profiles, Alerts
 - search across device, owner, profile, and network fields
 - Settings CSV/TSV roster preview and local active-profile import for demo/small-event workflows
+- Profiles source filters plus imported CSV roster export/clear actions
 - device inspection panel
 - dashboard source switcher for Demo, Omada, and optional Omada Printing Press CLI snapshots
 - Usage view with current snapshot totals, source-filtered recent history, local retention counts and manual pruning, source-filtered JSON archive export/import with dry-run preview and confirm, snapshot trend metrics and Markdown trend reports, tunable/exportable/importable review policy thresholds, open capture review queue with workload counts, stored capture detail, selected-capture JSON/Markdown export, stored-capture replay, review notes, reviewed state, single-capture deletion, previous-capture deltas, explicit same-source comparison baselines, new/missing device movement, generated review-signal hints, and rollups by location, SSID, and AP
@@ -21,7 +22,7 @@ Latest completed slices:
 - local review actions: assign, reviewed, watch, block
 - local alert actions: acknowledge, resolve
 - localStorage persistence for demo review state
-- imported CSV profiles persist in the same browser-local demo review state and feed Profiles, owner mix, resolution, search, and assignment dropdowns
+- imported CSV profiles persist in the same browser-local demo review state and feed Profiles, owner mix, resolution, search, and assignment dropdowns; clearing imported profiles also clears owner overrides pointing at CSV-only profiles
 - JSON export of the current demo snapshot
 - activity log for review actions
 - safe Omada CLI doctor route that returns readiness checks only

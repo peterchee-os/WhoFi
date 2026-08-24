@@ -10,6 +10,7 @@ export type ProfileType =
   | "unknown";
 
 export type ProfileLevel = "seen" | "claimed" | "verified" | "linked" | "operational";
+export type ProfileSource = "demo" | "csv";
 
 export type DeviceStatus =
   | "unknown"
@@ -30,6 +31,7 @@ export type Profile = {
   displayName: string;
   profileType: ProfileType;
   profileLevel: ProfileLevel;
+  source?: ProfileSource;
   organizationName?: string;
   eventName?: string;
   teamName?: string;

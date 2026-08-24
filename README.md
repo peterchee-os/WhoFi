@@ -50,7 +50,7 @@ The current demo app includes device review, source switching, local CSV roster 
 
 ## Local Roster Import
 
-Settings includes a CSV/TSV roster importer for development and small-event workflows. Operators can paste rows with columns such as `name`, `email`, `company`, `profile_type`, and `status`, preview the parsed people/companies, then import those people into the active local profile roster. Imported profiles are stored in browser local state with the demo review state, appear in the Profiles tab, count toward the sidebar/profile mix, and can be assigned to devices in the inspector. This is a local bridge toward tenant-scoped database-backed identity sync; it is not yet the final hosted identity-provider persistence layer.
+Settings includes a CSV/TSV roster importer for development and small-event workflows. Operators can paste rows with columns such as `name`, `email`, `company`, `profile_type`, and `status`, preview the parsed people/companies, then import those people into the active local profile roster. Imported profiles are stored in browser local state with the demo review state, appear in the Profiles tab, count toward the sidebar/profile mix, and can be assigned to devices in the inspector. The Profiles tab can filter Demo vs CSV profiles, export the imported CSV roster, and clear imported CSV profiles; clearing imported profiles also removes local device owner overrides that pointed at those CSV-only profiles. This is a local bridge toward tenant-scoped database-backed identity sync; it is not yet the final hosted identity-provider persistence layer.
 
 ## Admin Gate
 

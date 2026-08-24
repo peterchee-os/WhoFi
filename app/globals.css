@@ -1247,11 +1247,23 @@ textarea {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.profile-source-filter {
+  padding-top: 12px;
+}
+
 .profile-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
   display: grid;
+  gap: 8px;
+}
+
+.profile-card-title {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 8px;
 }
 

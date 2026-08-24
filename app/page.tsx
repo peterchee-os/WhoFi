@@ -42,7 +42,7 @@ import {
   type SnapshotReviewQueueItem,
   type SnapshotReviewQueueSummary
 } from "@/lib/snapshot-history";
-import type { Alert, AlertStatus, Device, DeviceStatus, Profile, RiskState } from "@/lib/types";
+import type { Alert, AlertStatus, Device, DeviceStatus, Profile, ProfileSource, RiskState } from "@/lib/types";
 
 type View = "dashboard" | "devices" | "usage" | "profiles" | "alerts" | "settings";
 type DeviceSnapshotSource = "demo" | "omada" | "omada-pp";
@@ -1367,6 +1367,40 @@ export default function Home() {
     addActivity(setActivity, `Imported ${nextProfiles.length} CSV roster ${nextProfiles.length === 1 ? "profile" : "profiles"}`);
   };
 
+  const exportImportedProfiles = () => {
+    const rows = importedProfiles.map((profile) => ({
+      company: profile.organizationName ?? "",
+      email: profile.email ?? "",
+      id: profile.id,
+      name: profile.displayName,
+      profile_type: profile.profileType,
+      status: profile.profileLevel === "seen" ? "inactive" : "active"
+    }));
+    const csv = toCsv([
+      ["id", "name", "email", "company", "profile_type", "status"],
+      ...rows.map((row) => [row.id, row.name, row.email, row.company, row.profile_type, row.status])
+    ]);
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `whofi-imported-profiles-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setNotice("Imported roster exported");
+    addActivity(setActivity, `Exported ${importedProfiles.length} imported CSV ${importedProfiles.length === 1 ? "profile" : "profiles"}`);
+  };
+
+  const clearImportedProfiles = () => {
+    const importedProfileIds = new Set(importedProfiles.map((profile) => profile.id));
+    setImportedProfiles([]);
+    setProfileOverrides((current) =>
+      Object.fromEntries(Object.entries(current).filter(([, profileId]) => !profileId || !importedProfileIds.has(profileId)))
+    );
+    setNotice("Imported roster cleared");
+    addActivity(setActivity, `Cleared ${importedProfiles.length} imported CSV ${importedProfiles.length === 1 ? "profile" : "profiles"}`);
+  };
+
   const setDeviceRisk = (deviceId: string, riskState: RiskState) => {
     setRiskOverrides((current) => ({ ...current, [deviceId]: riskState }));
     setNotice(riskState === "normal" ? "Marked reviewed" : "Device updated");
@@ -1652,7 +1686,14 @@ export default function Home() {
             snapshotStorageLimits={snapshotStorageLimits}
           />
         ) : null}
-        {activeView === "profiles" ? <ProfilesView profiles={profiles} /> : null}
+        {activeView === "profiles" ? (
+          <ProfilesView
+            importedCount={importedProfiles.length}
+            onClearImported={clearImportedProfiles}
+            onExportImported={exportImportedProfiles}
+            profiles={profiles}
+          />
+        ) : null}
         {activeView === "alerts" ? <AlertsView alerts={alerts} onSetAlertStatus={setAlertStatus} /> : null}
         {activeView === "settings" ? (
           <SettingsView
@@ -2946,24 +2987,74 @@ function DeviceChangeList({
   );
 }
 
-function ProfilesView({ profiles }: { profiles: Profile[] }) {
+function ProfilesView({
+  importedCount,
+  onClearImported,
+  onExportImported,
+  profiles
+}: {
+  importedCount: number;
+  onClearImported: () => void;
+  onExportImported: () => void;
+  profiles: Profile[];
+}) {
+  const [sourceFilter, setSourceFilter] = useState<"all" | ProfileSource>("all");
+  const filteredProfiles = sourceFilter === "all"
+    ? profiles
+    : profiles.filter((profile) => getProfileSource(profile) === sourceFilter);
+  const sourceCounts = {
+    all: profiles.length,
+    csv: profiles.filter((profile) => getProfileSource(profile) === "csv").length,
+    demo: profiles.filter((profile) => getProfileSource(profile) === "demo").length
+  };
+
   return (
     <section className="panel">
       <div className="panel-header">
         <div>
           <h3>Profiles</h3>
-          <p>{profiles.length} known owners.</p>
+          <p>{filteredProfiles.length} of {profiles.length} known owners.</p>
         </div>
-        <ShieldCheck size={20} color="var(--green)" />
+        <div className="panel-actions">
+          <button className="text-button slim" disabled={importedCount === 0} onClick={onExportImported}>
+            Export CSV
+          </button>
+          <button className="text-button slim danger" disabled={importedCount === 0} onClick={onClearImported}>
+            Clear CSV
+          </button>
+          <ShieldCheck size={20} color="var(--green)" />
+        </div>
+      </div>
+      <div className="source-filter profile-source-filter" aria-label="Profile source filter">
+        {(["all", "demo", "csv"] as const).map((source) => (
+          <button
+            className={sourceFilter === source ? "active" : ""}
+            key={source}
+            onClick={() => setSourceFilter(source)}
+            type="button"
+          >
+            <span>{source === "all" ? "All" : source.toUpperCase()}</span>
+            <strong>{sourceCounts[source]}</strong>
+          </button>
+        ))}
       </div>
       <div className="profile-grid wide">
-        {profiles.map((profile) => (
+        {filteredProfiles.map((profile) => (
           <div className="profile-card" key={profile.id}>
-            <strong className="truncate">{profile.displayName}</strong>
+            <div className="profile-card-title">
+              <strong className="truncate">{profile.displayName}</strong>
+              <span className="metric-pill">{getProfileSource(profile).toUpperCase()}</span>
+            </div>
             <span>{profile.profileType} · {profile.profileLevel}</span>
             <span className="truncate">{profile.organizationName ?? "No organization"}</span>
           </div>
         ))}
+        {filteredProfiles.length === 0 ? (
+          <div className="profile-card">
+            <strong>No profiles</strong>
+            <span>No owners match this source.</span>
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -4114,6 +4205,7 @@ function csvSnapshotToProfiles(snapshot: CsvIdentitySnapshotPayload): Profile[] 
     lastSeen: now,
     organizationName: person.companyExternalId ? companyById.get(person.companyExternalId) : undefined,
     profileLevel: person.status === "active" ? "verified" : "seen",
+    source: "csv",
     profileType: person.profileHint ?? "unknown"
   }));
 }
@@ -4138,6 +4230,10 @@ function getOwnerMix(profiles: Profile[]) {
   ];
 }
 
+function getProfileSource(profile: Profile): ProfileSource {
+  return profile.source ?? "demo";
+}
+
 function profileTypeSortOrder(profileType: Profile["profileType"]) {
   const order: Profile["profileType"][] = ["staff", "agent", "customer", "guest", "event_attendee", "drop_in", "vendor", "machine", "unknown"];
   return order.indexOf(profileType);
@@ -4145,6 +4241,14 @@ function profileTypeSortOrder(profileType: Profile["profileType"]) {
 
 function slugifyProfileId(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "profile";
+}
+
+function toCsv(rows: string[][]) {
+  return `${rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n")}\n`;
+}
+
+function escapeCsvCell(value: string) {
+  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
 function addActivity(setActivity: (updater: (current: ActivityEntry[]) => ActivityEntry[]) => void, message: string) {
