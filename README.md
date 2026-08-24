@@ -56,6 +56,8 @@ Imported and demo profiles also feed local profile-link suggestions. When an unc
 
 The Profiles tab can also export current device owner bindings and import CSV/TSV bindings back into the local review state after a preview/confirm step. The preview shows matched rows and skipped rows before anything is written. Binding import matches devices by `device_id`, `mac`, or `hostname`, and profiles by `profile_id`, `profile_email`, or `profile_name`. This is meant for operator handoff and demo recovery; it is not a replacement for database-backed device/profile binding persistence.
 
+Profiles also supports a JSON operator review package for moving browser-local review work between machines. `Export Package` includes imported CSV profiles, device owner bindings, device status/risk overrides, and ignored profile suggestions. `Import Package` previews importable and skipped rows before merging only valid package state into the current browser/device snapshot. This is a demo and handoff convenience, separate from server-backed snapshot history archives and future database persistence.
+
 ## Admin Gate
 
 Demo mode is open by default. Hosted deployments that can reach live WiFi providers should set:

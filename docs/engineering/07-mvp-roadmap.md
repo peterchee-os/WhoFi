@@ -124,6 +124,7 @@ Deliverables:
 - normalized companies/people/contracts
 - profile link suggestions and operator review queue
 - local device/profile binding import/export for operator handoff
+- local operator review package export/import for imported profiles, bindings, status/risk overrides, and ignored profile suggestions
 
 Exit criteria:
 
@@ -131,6 +132,7 @@ Exit criteria:
 - CSV people can be imported into the local roster and assigned to devices
 - hostname/person/org evidence can suggest profile links for individual or visible-batch operator review, including ignored false-positive handling
 - staff can export and preview/re-import reviewed device owner bindings during local/demo workflows
+- staff can move browser-local profile review work as a previewed JSON operator package during demo/handoff workflows
 - email/external id can suggest profile links
 - Yardi is supported without Thinkspace hardcoding
 

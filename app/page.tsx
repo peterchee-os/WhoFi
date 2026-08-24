@@ -92,6 +92,38 @@ type PendingDeviceBindingImport = {
   fileName: string;
   summary: DeviceBindingImportSummary;
 };
+type OperatorReviewPackage = {
+  exportedAt?: string;
+  ignoredProfileSuggestionIds?: unknown;
+  importedProfiles?: unknown;
+  profileOverrides?: unknown;
+  riskOverrides?: unknown;
+  schema?: string;
+  statusOverrides?: unknown;
+};
+type OperatorReviewPackageImportSummary = {
+  ignoredSuggestions: number;
+  importableBindings: number;
+  importableProfiles: number;
+  importableRiskOverrides: number;
+  importableStatusOverrides: number;
+  skippedBindings: number;
+  skippedProfiles: number;
+  skippedRiskOverrides: number;
+  skippedStatusOverrides: number;
+};
+type PendingOperatorReviewPackageImport = {
+  fileName: string;
+  package: NormalizedOperatorReviewPackage;
+  summary: OperatorReviewPackageImportSummary;
+};
+type NormalizedOperatorReviewPackage = {
+  ignoredProfileSuggestionIds: string[];
+  importedProfiles: Profile[];
+  profileOverrides: Record<string, string>;
+  riskOverrides: Record<string, RiskState>;
+  statusOverrides: Record<string, DeviceStatus>;
+};
 type NotificationProviderMode = "disabled" | "console" | "resend";
 type EmailDeliveryStatus = "sent" | "failed" | "disabled" | "rendered";
 type NotificationRuleKey =
@@ -344,6 +376,7 @@ const seededEmailDeliveries: EmailDelivery[] = [
 ];
 
 export default function Home() {
+  const operatorReviewPackageImportRef = useRef<HTMLInputElement>(null);
   const snapshotArchiveImportRef = useRef<HTMLInputElement>(null);
   const snapshotReviewPolicyImportRef = useRef<HTMLInputElement>(null);
   const [activeView, setActiveView] = useState<View>("dashboard");
@@ -367,6 +400,7 @@ export default function Home() {
     message: "No capture selected",
     status: "idle"
   });
+  const [pendingOperatorReviewPackageImport, setPendingOperatorReviewPackageImport] = useState<PendingOperatorReviewPackageImport>();
   const [pendingSnapshotArchiveImport, setPendingSnapshotArchiveImport] = useState<PendingSnapshotArchiveImport>();
   const [pendingDeviceBindingImport, setPendingDeviceBindingImport] = useState<PendingDeviceBindingImport>();
   const [adminAuth, setAdminAuth] = useState<AdminAuthState>({
@@ -1569,6 +1603,94 @@ export default function Home() {
     );
   };
 
+  const exportOperatorReviewPackage = () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      ignoredProfileSuggestionIds,
+      importedProfiles,
+      profileOverrides,
+      riskOverrides,
+      schema: "whofi.operator-review-package.v1",
+      statusOverrides
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `whofi-operator-review-package-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setNotice("Review package exported");
+    addActivity(setActivity, "Exported operator review package");
+  };
+
+  const importOperatorReviewPackage = async (file?: File | null) => {
+    if (!file) return;
+
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      const preview = previewOperatorReviewPackageImport(parsed, devices, profiles);
+      if (!preview) {
+        throw new Error("Invalid operator review package");
+      }
+
+      const hasImportableState =
+        preview.summary.importableProfiles > 0 ||
+        preview.summary.importableBindings > 0 ||
+        preview.summary.importableStatusOverrides > 0 ||
+        preview.summary.importableRiskOverrides > 0 ||
+        preview.summary.ignoredSuggestions > 0;
+      if (!hasImportableState) {
+        setPendingOperatorReviewPackageImport(undefined);
+        setNotice("No review package changes");
+        addActivity(setActivity, "Operator review package preview had no importable state");
+        return;
+      }
+
+      setPendingOperatorReviewPackageImport({
+        fileName: file.name,
+        package: preview.package,
+        summary: preview.summary
+      });
+      setNotice("Review package previewed");
+      addActivity(setActivity, `Previewed operator review package (${preview.summary.importableProfiles} profiles, ${preview.summary.importableBindings} bindings)`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Review package import failed";
+      setNotice("Review package import failed");
+      addActivity(setActivity, `Operator review package import failed: ${message}`);
+    } finally {
+      if (operatorReviewPackageImportRef.current) {
+        operatorReviewPackageImportRef.current.value = "";
+      }
+    }
+  };
+
+  const confirmOperatorReviewPackageImport = () => {
+    if (!pendingOperatorReviewPackageImport) {
+      setNotice("No review package pending");
+      return;
+    }
+
+    const nextPackage = pendingOperatorReviewPackageImport.package;
+    setImportedProfiles((current) => mergeProfiles(current, nextPackage.importedProfiles));
+    setProfileOverrides((current) => ({
+      ...current,
+      ...nextPackage.profileOverrides
+    }));
+    setStatusOverrides((current) => ({
+      ...current,
+      ...nextPackage.statusOverrides
+    }));
+    setRiskOverrides((current) => ({
+      ...current,
+      ...nextPackage.riskOverrides
+    }));
+    setIgnoredProfileSuggestionIds((current) => Array.from(new Set([...current, ...nextPackage.ignoredProfileSuggestionIds])));
+    setPendingOperatorReviewPackageImport(undefined);
+    setNotice("Review package imported");
+    addActivity(setActivity, "Imported operator review package");
+  };
+
   const importCsvProfiles = (nextProfiles: Profile[]) => {
     if (nextProfiles.length === 0) {
       setNotice("No profiles imported");
@@ -1919,12 +2041,19 @@ export default function Home() {
             devices={devices}
             importedCount={importedProfiles.length}
             onCancelDeviceBindingImport={() => setPendingDeviceBindingImport(undefined)}
+            onCancelOperatorReviewPackageImport={() => setPendingOperatorReviewPackageImport(undefined)}
             onClearImported={clearImportedProfiles}
             onConfirmDeviceBindingImport={confirmDeviceBindingImport}
+            onConfirmOperatorReviewPackageImport={confirmOperatorReviewPackageImport}
             onExportDeviceBindings={exportDeviceBindings}
             onExportImported={exportImportedProfiles}
+            onExportOperatorReviewPackage={exportOperatorReviewPackage}
             onImportDeviceBindings={importDeviceBindings}
+            onImportOperatorReviewPackage={importOperatorReviewPackage}
+            onOpenOperatorReviewPackageImport={() => operatorReviewPackageImportRef.current?.click()}
+            operatorReviewPackageImportRef={operatorReviewPackageImportRef}
             pendingDeviceBindingImport={pendingDeviceBindingImport}
+            pendingOperatorReviewPackageImport={pendingOperatorReviewPackageImport}
             profiles={profiles}
           />
         ) : null}
@@ -3270,23 +3399,37 @@ function ProfilesView({
   devices,
   importedCount,
   onCancelDeviceBindingImport,
+  onCancelOperatorReviewPackageImport,
   onClearImported,
   onConfirmDeviceBindingImport,
+  onConfirmOperatorReviewPackageImport,
   onExportDeviceBindings,
   onExportImported,
+  onExportOperatorReviewPackage,
   onImportDeviceBindings,
+  onImportOperatorReviewPackage,
+  onOpenOperatorReviewPackageImport,
+  operatorReviewPackageImportRef,
   pendingDeviceBindingImport,
+  pendingOperatorReviewPackageImport,
   profiles
 }: {
   devices: Device[];
   importedCount: number;
   onCancelDeviceBindingImport: () => void;
+  onCancelOperatorReviewPackageImport: () => void;
   onClearImported: () => void;
   onConfirmDeviceBindingImport: () => void;
+  onConfirmOperatorReviewPackageImport: () => void;
   onExportDeviceBindings: () => void;
   onExportImported: () => void;
+  onExportOperatorReviewPackage: () => void;
   onImportDeviceBindings: (file?: File | null) => void;
+  onImportOperatorReviewPackage: (file?: File | null) => void;
+  onOpenOperatorReviewPackageImport: () => void;
+  operatorReviewPackageImportRef: RefObject<HTMLInputElement>;
   pendingDeviceBindingImport?: PendingDeviceBindingImport;
+  pendingOperatorReviewPackageImport?: PendingOperatorReviewPackageImport;
   profiles: Profile[];
 }) {
   const bindingImportRef = useRef<HTMLInputElement>(null);
@@ -3321,6 +3464,12 @@ function ProfilesView({
           <button className="text-button slim" onClick={() => bindingImportRef.current?.click()}>
             Import Bindings
           </button>
+          <button className="text-button slim" onClick={onExportOperatorReviewPackage}>
+            Export Package
+          </button>
+          <button className="text-button slim" onClick={onOpenOperatorReviewPackageImport}>
+            Import Package
+          </button>
           <input
             accept=".csv,.tsv,text/csv,text/tab-separated-values,text/plain"
             className="hidden-file-input"
@@ -3329,6 +3478,16 @@ function ProfilesView({
               event.currentTarget.value = "";
             }}
             ref={bindingImportRef}
+            type="file"
+          />
+          <input
+            accept="application/json,.json"
+            className="hidden-file-input"
+            onChange={(event) => {
+              onImportOperatorReviewPackage(event.target.files?.[0]);
+              event.currentTarget.value = "";
+            }}
+            ref={operatorReviewPackageImportRef}
             type="file"
           />
           <ShieldCheck size={20} color="var(--green)" />
@@ -3352,6 +3511,13 @@ function ProfilesView({
           onCancel={onCancelDeviceBindingImport}
           onConfirm={onConfirmDeviceBindingImport}
           pendingImport={pendingDeviceBindingImport}
+        />
+      ) : null}
+      {pendingOperatorReviewPackageImport ? (
+        <OperatorReviewPackageImportPreview
+          onCancel={onCancelOperatorReviewPackageImport}
+          onConfirm={onConfirmOperatorReviewPackageImport}
+          pendingImport={pendingOperatorReviewPackageImport}
         />
       ) : null}
       <div className="profile-grid wide">
@@ -3438,6 +3604,66 @@ function DeviceBindingImportPreview({
             <p>No skipped rows.</p>
           )}
         </div>
+      </div>
+      <div className="archive-import-actions">
+        <button className="text-button slim" onClick={onCancel} type="button">
+          Cancel
+        </button>
+        <button className="text-button slim primary" onClick={onConfirm} type="button">
+          Confirm Import
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function OperatorReviewPackageImportPreview({
+  onCancel,
+  onConfirm,
+  pendingImport
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+  pendingImport: PendingOperatorReviewPackageImport;
+}) {
+  const summary = pendingImport.summary;
+
+  return (
+    <div className="archive-import-preview">
+      <div>
+        <strong>Operator Review Package Preview</strong>
+        <span>{pendingImport.fileName}</span>
+      </div>
+      <div className="review-queue-summary">
+        <div>
+          <span>Profiles</span>
+          <strong>{summary.importableProfiles}</strong>
+        </div>
+        <div>
+          <span>Bindings</span>
+          <strong>{summary.importableBindings}</strong>
+        </div>
+        <div>
+          <span>Status</span>
+          <strong>{summary.importableStatusOverrides}</strong>
+        </div>
+        <div>
+          <span>Risk</span>
+          <strong>{summary.importableRiskOverrides}</strong>
+        </div>
+        <div>
+          <span>Ignored</span>
+          <strong>{summary.ignoredSuggestions}</strong>
+        </div>
+      </div>
+      <p>
+        Confirming merges imported CSV profiles, device owner bindings, status/risk review state, and ignored profile suggestions into this browser.
+      </p>
+      <div className="archive-import-metrics">
+        <span>{summary.skippedProfiles} skipped profiles</span>
+        <span>{summary.skippedBindings} skipped bindings</span>
+        <span>{summary.skippedStatusOverrides} skipped status rows</span>
+        <span>{summary.skippedRiskOverrides} skipped risk rows</span>
       </div>
       <div className="archive-import-actions">
         <button className="text-button slim" onClick={onCancel} type="button">
@@ -4863,6 +5089,141 @@ function importDeviceBindingRows(input: string, devices: Device[], profiles: Pro
     skippedRows,
     statusOverrides
   };
+}
+
+function previewOperatorReviewPackageImport(input: unknown, devices: Device[], profiles: Profile[]) {
+  const archive = readOperatorReviewPackage(input);
+  if (!archive) return undefined;
+
+  const deviceIds = new Set(devices.map((device) => device.id));
+  const importedProfiles = Array.isArray(archive.importedProfiles)
+    ? archive.importedProfiles.filter(isImportableProfile).map(normalizeImportedProfile)
+    : [];
+  const allProfileIds = new Set([...profiles.map((profile) => profile.id), ...importedProfiles.map((profile) => profile.id)]);
+  const profileOverrides = filterProfileOverrides(archive.profileOverrides, deviceIds, allProfileIds);
+  const statusOverrides = filterStatusOverrides(archive.statusOverrides, deviceIds);
+  const riskOverrides = filterRiskOverrides(archive.riskOverrides, deviceIds);
+  const ignoredProfileSuggestionIds = Array.isArray(archive.ignoredProfileSuggestionIds)
+    ? archive.ignoredProfileSuggestionIds.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    : [];
+  const rawProfileCount = Array.isArray(archive.importedProfiles) ? archive.importedProfiles.length : 0;
+  const rawProfileOverrideCount = countObjectEntries(archive.profileOverrides);
+  const rawStatusOverrideCount = countObjectEntries(archive.statusOverrides);
+  const rawRiskOverrideCount = countObjectEntries(archive.riskOverrides);
+
+  return {
+    package: {
+      ignoredProfileSuggestionIds: Array.from(new Set(ignoredProfileSuggestionIds)),
+      importedProfiles,
+      profileOverrides,
+      riskOverrides,
+      statusOverrides
+    },
+    summary: {
+      ignoredSuggestions: ignoredProfileSuggestionIds.length,
+      importableBindings: Object.keys(profileOverrides).length,
+      importableProfiles: importedProfiles.length,
+      importableRiskOverrides: Object.keys(riskOverrides).length,
+      importableStatusOverrides: Object.keys(statusOverrides).length,
+      skippedBindings: Math.max(0, rawProfileOverrideCount - Object.keys(profileOverrides).length),
+      skippedProfiles: Math.max(0, rawProfileCount - importedProfiles.length),
+      skippedRiskOverrides: Math.max(0, rawRiskOverrideCount - Object.keys(riskOverrides).length),
+      skippedStatusOverrides: Math.max(0, rawStatusOverrideCount - Object.keys(statusOverrides).length)
+    }
+  };
+}
+
+function readOperatorReviewPackage(input: unknown): OperatorReviewPackage | undefined {
+  if (!input || typeof input !== "object") return undefined;
+  const maybeSnapshot = input as { reviewState?: unknown };
+  const archive = maybeSnapshot.reviewState && typeof maybeSnapshot.reviewState === "object"
+    ? maybeSnapshot.reviewState as OperatorReviewPackage
+    : input as OperatorReviewPackage;
+  if (
+    !("importedProfiles" in archive) &&
+    !("profileOverrides" in archive) &&
+    !("statusOverrides" in archive) &&
+    !("riskOverrides" in archive) &&
+    !("ignoredProfileSuggestionIds" in archive)
+  ) {
+    return undefined;
+  }
+  return archive;
+}
+
+function isImportableProfile(value: unknown): value is Profile {
+  if (!value || typeof value !== "object") return false;
+  const profile = value as Partial<Profile>;
+  return (
+    typeof profile.id === "string" &&
+    profile.id.trim().length > 0 &&
+    typeof profile.displayName === "string" &&
+    profile.displayName.trim().length > 0 &&
+    isProfileType(profile.profileType) &&
+    isProfileLevel(profile.profileLevel) &&
+    (!profile.source || profile.source === "csv") &&
+    typeof profile.lastSeen === "string"
+  );
+}
+
+function normalizeImportedProfile(profile: Profile): Profile {
+  return {
+    ...profile,
+    source: "csv"
+  };
+}
+
+function filterProfileOverrides(input: unknown, deviceIds: Set<string>, profileIds: Set<string>) {
+  if (!input || typeof input !== "object") return {};
+  const output: Record<string, string> = {};
+  for (const [deviceId, profileId] of Object.entries(input as Record<string, unknown>)) {
+    if (typeof profileId === "string" && deviceIds.has(deviceId) && profileIds.has(profileId)) {
+      output[deviceId] = profileId;
+    }
+  }
+  return output;
+}
+
+function filterStatusOverrides(input: unknown, deviceIds: Set<string>) {
+  if (!input || typeof input !== "object") return {};
+  const output: Record<string, DeviceStatus> = {};
+  for (const [deviceId, status] of Object.entries(input as Record<string, unknown>)) {
+    if (typeof status === "string" && deviceIds.has(deviceId) && isDeviceStatus(status)) {
+      output[deviceId] = status;
+    }
+  }
+  return output;
+}
+
+function filterRiskOverrides(input: unknown, deviceIds: Set<string>) {
+  if (!input || typeof input !== "object") return {};
+  const output: Record<string, RiskState> = {};
+  for (const [deviceId, riskState] of Object.entries(input as Record<string, unknown>)) {
+    if (typeof riskState === "string" && deviceIds.has(deviceId) && isRiskState(riskState)) {
+      output[deviceId] = riskState;
+    }
+  }
+  return output;
+}
+
+function countObjectEntries(input: unknown) {
+  return input && typeof input === "object" ? Object.keys(input).length : 0;
+}
+
+function isProfileType(value: unknown): value is Profile["profileType"] {
+  return typeof value === "string" && ["guest", "event_attendee", "drop_in", "customer", "staff", "vendor", "agent", "machine", "unknown"].includes(value);
+}
+
+function isProfileLevel(value: unknown): value is Profile["profileLevel"] {
+  return typeof value === "string" && ["seen", "claimed", "verified", "linked", "operational"].includes(value);
+}
+
+function isDeviceStatus(value: unknown): value is DeviceStatus {
+  return typeof value === "string" && ["unknown", "claimed", "staff_assigned", "managed", "agent_host", "revoked", "ignored"].includes(value);
+}
+
+function isRiskState(value: unknown): value is RiskState {
+  return typeof value === "string" && ["normal", "watch", "automation_like", "possible_bot", "known_agent", "needs_review"].includes(value);
 }
 
 function findImportDevice(
