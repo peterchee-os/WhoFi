@@ -25,7 +25,8 @@ export async function GET(
   }
 
   const { id } = await params;
-  const detail = await readSnapshotCaptureDetail(id);
+  const compareToId = request.nextUrl.searchParams.get("compareTo") || undefined;
+  const detail = await readSnapshotCaptureDetail(id, process.env, compareToId);
   if (!detail) {
     return NextResponse.json(
       {

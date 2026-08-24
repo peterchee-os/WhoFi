@@ -62,19 +62,26 @@ export async function readSnapshotCapture(id: string, env: NodeJS.ProcessEnv = p
 
 export async function readSnapshotCaptureDetail(
   id: string,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  compareToId?: string
 ): Promise<{ capture: SnapshotCaptureRecord; comparison?: SnapshotCaptureComparison } | undefined> {
   const captures = await readSnapshotCaptures(env);
   const capture = captures.find((candidate) => candidate.id === id);
   if (!capture) return undefined;
 
-  const previous = captures
-    .filter((candidate) =>
-      candidate.id !== capture.id &&
-      candidate.summary.source === capture.summary.source &&
-      new Date(candidate.summary.observedAt).getTime() < new Date(capture.summary.observedAt).getTime()
-    )
-    .sort((a, b) => new Date(b.summary.observedAt).getTime() - new Date(a.summary.observedAt).getTime())[0];
+  const previous = compareToId
+    ? captures.find((candidate) =>
+        candidate.id === compareToId &&
+        candidate.id !== capture.id &&
+        candidate.summary.source === capture.summary.source
+      )
+    : captures
+        .filter((candidate) =>
+          candidate.id !== capture.id &&
+          candidate.summary.source === capture.summary.source &&
+          new Date(candidate.summary.observedAt).getTime() < new Date(capture.summary.observedAt).getTime()
+        )
+        .sort((a, b) => new Date(b.summary.observedAt).getTime() - new Date(a.summary.observedAt).getTime())[0];
 
   return {
     capture,

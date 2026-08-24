@@ -640,6 +640,10 @@ textarea {
   resize: vertical;
 }
 
+.capture-baseline-field {
+  margin: 0 18px 12px;
+}
+
 .comparison-grid {
   padding: 0 18px 14px;
   display: grid;

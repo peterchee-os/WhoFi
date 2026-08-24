@@ -1102,7 +1102,7 @@ export default function Home() {
     }
   };
 
-  const loadSnapshotCapture = async (entryId: string) => {
+  const loadSnapshotCapture = async (entryId: string, compareToId?: string) => {
     setSelectedSnapshotCaptureId(entryId);
     setSnapshotCaptureState({
       message: "Loading capture",
@@ -1110,7 +1110,8 @@ export default function Home() {
     });
 
     try {
-      const response = await fetch(`/api/snapshot-history/${encodeURIComponent(entryId)}`);
+      const params = compareToId ? `?compareTo=${encodeURIComponent(compareToId)}` : "";
+      const response = await fetch(`/api/snapshot-history/${encodeURIComponent(entryId)}${params}`);
       const payload = (await response.json()) as {
         capture?: SnapshotCaptureRecord;
         comparison?: SnapshotCaptureComparison;
@@ -1124,11 +1125,11 @@ export default function Home() {
       setSelectedSnapshotCapture(payload.capture);
       setSnapshotReviewNoteDraft(payload.capture.summary.reviewNote ?? "");
       setSnapshotCaptureState({
-        message: "Capture loaded",
+        message: compareToId ? "Baseline loaded" : "Capture loaded",
         status: "success",
         testedAt: new Date().toISOString()
       });
-      setNotice("Capture loaded");
+      setNotice(compareToId ? "Comparison baseline loaded" : "Capture loaded");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Capture load failed";
       setSelectedSnapshotComparison(undefined);
@@ -1856,7 +1857,7 @@ function UsageView({
   onExportSnapshotTrendReport: (sourceFilter: SnapshotHistorySourceFilter) => void;
   onImportSnapshotArchive: (file?: File | null) => void;
   onImportSnapshotReviewPolicy: (file?: File | null) => void;
-  onLoadSnapshotCapture: (entryId: string) => void;
+  onLoadSnapshotCapture: (entryId: string, compareToId?: string) => void;
   onMarkVisibleSnapshotQueueReviewed: (ids: string[]) => void;
   onOpenSnapshotArchiveImport: () => void;
   onOpenSnapshotReviewPolicyImport: () => void;
@@ -1918,6 +1919,15 @@ function UsageView({
     () => buildSnapshotTrends(snapshotHistory, snapshotReviewPolicy, historySourceFilter),
     [historySourceFilter, snapshotHistory, snapshotReviewPolicy]
   );
+  const comparisonBaselineOptions = useMemo(() => {
+    if (!selectedSnapshotCapture) return [];
+    const persistedEntryIdSet = new Set(persistedSnapshotCaptureIds);
+    return snapshotHistory.filter((entry) =>
+      entry.id !== selectedSnapshotCapture.id &&
+      entry.source === selectedSnapshotCapture.summary.source &&
+      persistedEntryIdSet.has(entry.id)
+    );
+  }, [persistedSnapshotCaptureIds, selectedSnapshotCapture, snapshotHistory]);
 
   return (
     <section className="content-grid usage-layout">
@@ -2001,8 +2011,10 @@ function UsageView({
           trends={snapshotTrends}
         />
         <SnapshotCapturePanel
+          baselineOptions={comparisonBaselineOptions}
           capture={selectedSnapshotCapture}
           comparison={selectedSnapshotComparison}
+          onBaselineChange={(baselineId) => selectedSnapshotCaptureId && onLoadSnapshotCapture(selectedSnapshotCaptureId, baselineId)}
           onDelete={onDeleteSelectedSnapshotCapture}
           onExport={onExportSelectedSnapshotCapture}
           onExportReport={onExportSelectedSnapshotReport}
@@ -2148,8 +2160,10 @@ function SnapshotTrendsPanel({
 }
 
 function SnapshotCapturePanel({
+  baselineOptions,
   capture,
   comparison,
+  onBaselineChange,
   onDelete,
   onExport,
   onExportReport,
@@ -2159,8 +2173,10 @@ function SnapshotCapturePanel({
   reviewNoteDraft,
   state
 }: {
+  baselineOptions: SnapshotHistoryEntry[];
   capture?: SnapshotCaptureRecord;
   comparison?: SnapshotCaptureComparison;
+  onBaselineChange: (baselineId: string) => void;
   onDelete: () => void;
   onExport: () => void;
   onExportReport: () => void;
@@ -2247,6 +2263,21 @@ function SnapshotCapturePanel({
               Save Note
             </button>
           </div>
+          <label className="select-field capture-baseline-field">
+            <span>Compare baseline</span>
+            <select
+              disabled={baselineOptions.length === 0}
+              onChange={(event) => event.target.value && onBaselineChange(event.target.value)}
+              value={comparison?.previousId ?? ""}
+            >
+              <option value="">Previous same-source capture</option>
+              {baselineOptions.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {formatDeviceSourceLabel(entry.source)} · {formatShortDateTime(entry.observedAt)} · {entry.onlineDevices} devices
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="comparison-grid">
             <div>
               <span>Devices</span>
@@ -3989,6 +4020,17 @@ function formatSignedBytes(delta: number) {
   if (delta > 0) return `+${formatBytes(delta)}`;
   if (delta < 0) return `-${formatBytes(Math.abs(delta))}`;
   return "Base";
+}
+
+function formatShortDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en", {
+    day: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
+    month: "short"
+  }).format(date);
 }
 
 function formatHistoryTop(entry: SnapshotHistoryEntry) {

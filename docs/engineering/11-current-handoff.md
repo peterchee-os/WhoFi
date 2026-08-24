@@ -14,7 +14,7 @@ Latest completed slices:
 - search across device, owner, profile, and network fields
 - device inspection panel
 - dashboard source switcher for Demo, Omada, and optional Omada Printing Press CLI snapshots
-- Usage view with current snapshot totals, source-filtered recent history, local retention counts and manual pruning, source-filtered JSON archive export/import, snapshot trend metrics and Markdown trend reports, tunable/exportable/importable review policy thresholds, open capture review queue with workload counts, stored capture detail, selected-capture JSON/Markdown export, stored-capture replay, review notes, reviewed state, single-capture deletion, previous-capture deltas, new/missing device movement, generated review-signal hints, and rollups by location, SSID, and AP
+- Usage view with current snapshot totals, source-filtered recent history, local retention counts and manual pruning, source-filtered JSON archive export/import, snapshot trend metrics and Markdown trend reports, tunable/exportable/importable review policy thresholds, open capture review queue with workload counts, stored capture detail, selected-capture JSON/Markdown export, stored-capture replay, review notes, reviewed state, single-capture deletion, previous-capture deltas, explicit same-source comparison baselines, new/missing device movement, generated review-signal hints, and rollups by location, SSID, and AP
 - local file-backed snapshot audit history at `.whofi/snapshot-history.json`, with configurable bounded full captures and `WHOFI_SNAPSHOT_HISTORY_PATH` override
 - local file-backed snapshot review policy at `.whofi/snapshot-review-policy.json`, with `WHOFI_SNAPSHOT_REVIEW_POLICY_PATH` override
 - local review actions: assign, reviewed, watch, block
@@ -31,6 +31,7 @@ Latest completed slices:
 - `GET /api/snapshot-history/export` endpoint for source-filtered JSON archives of local snapshot audit state
 - `POST /api/snapshot-history/import` endpoint for merging JSON archives back into bounded local snapshot audit history
 - `PATCH /api/snapshot-history` endpoint with `action: "prune"` for applying local retention limits immediately
+- `GET /api/snapshot-history/{id}?compareTo={baseline_id}` support for explicit same-source capture comparison baselines
 - `WHOFI_SNAPSHOT_CAPTURE_LIMIT` and `WHOFI_SNAPSHOT_HISTORY_LIMIT` env knobs for local retention ceilings
 - `GET /api/snapshot-history/trends` endpoint for stored capture trend summaries and recent points
 - `GET /api/snapshot-history/trends/report` endpoint for filtered Markdown trend reports
