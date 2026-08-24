@@ -18,6 +18,7 @@ import {
   Send,
   Settings,
   ShieldCheck,
+  Upload,
   UserPlus,
   Users,
   Wifi,
@@ -1456,6 +1457,78 @@ export default function Home() {
     addActivity(setActivity, `Exported ${items.length} profile ${items.length === 1 ? "suggestion" : "suggestions"}`);
   };
 
+  const exportDeviceBindings = () => {
+    const rows = devices
+      .map((device) => {
+        const profile = device.profileId ? profileById.get(device.profileId) : undefined;
+        if (!profile) return undefined;
+        return [
+          device.id,
+          device.mac,
+          device.hostname,
+          device.ssid,
+          device.apName,
+          profile.id,
+          profile.displayName,
+          profile.email ?? "",
+          profile.organizationName ?? "",
+          getProfileSource(profile)
+        ];
+      })
+      .filter((row): row is string[] => Boolean(row));
+
+    if (rows.length === 0) {
+      setNotice("No bindings to export");
+      return;
+    }
+
+    const csv = toCsv([
+      ["device_id", "mac", "hostname", "ssid", "ap", "profile_id", "profile_name", "profile_email", "organization", "profile_source"],
+      ...rows
+    ]);
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `whofi-device-bindings-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setNotice("Bindings exported");
+    addActivity(setActivity, `Exported ${rows.length} device owner ${rows.length === 1 ? "binding" : "bindings"}`);
+  };
+
+  const importDeviceBindings = async (file?: File | null) => {
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const summary = importDeviceBindingRows(text, devices, profiles);
+      if (summary.matched === 0) {
+        setNotice("No bindings imported");
+        addActivity(setActivity, `Device binding import skipped ${summary.skipped} rows`);
+        return;
+      }
+
+      setProfileOverrides((current) => ({
+        ...current,
+        ...summary.profileOverrides
+      }));
+      setStatusOverrides((current) => ({
+        ...current,
+        ...summary.statusOverrides
+      }));
+      setNotice("Bindings imported");
+      addActivity(
+        setActivity,
+        `Imported ${summary.matched} device owner ${summary.matched === 1 ? "binding" : "bindings"} (${summary.skipped} skipped)`
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Binding import failed";
+      setNotice("Binding import failed");
+      addActivity(setActivity, `Device binding import failed: ${message}`);
+    }
+  };
+
   const importCsvProfiles = (nextProfiles: Profile[]) => {
     if (nextProfiles.length === 0) {
       setNotice("No profiles imported");
@@ -1577,6 +1650,7 @@ export default function Home() {
       exportedAt: new Date().toISOString(),
       notificationSettings,
       emailDeliveries,
+      ignoredProfileSuggestionIds,
       importedProfiles,
       snapshotHistory,
       profiles,
@@ -1584,6 +1658,7 @@ export default function Home() {
         activity,
         alertStatusOverrides,
         emailDeliveries,
+        ignoredProfileSuggestionIds,
         importedProfiles,
         notificationSettings,
         profileOverrides,
@@ -1801,9 +1876,12 @@ export default function Home() {
         ) : null}
         {activeView === "profiles" ? (
           <ProfilesView
+            devices={devices}
             importedCount={importedProfiles.length}
             onClearImported={clearImportedProfiles}
+            onExportDeviceBindings={exportDeviceBindings}
             onExportImported={exportImportedProfiles}
+            onImportDeviceBindings={importDeviceBindings}
             profiles={profiles}
           />
         ) : null}
@@ -3146,20 +3224,28 @@ function DeviceChangeList({
 }
 
 function ProfilesView({
+  devices,
   importedCount,
   onClearImported,
+  onExportDeviceBindings,
   onExportImported,
+  onImportDeviceBindings,
   profiles
 }: {
+  devices: Device[];
   importedCount: number;
   onClearImported: () => void;
+  onExportDeviceBindings: () => void;
   onExportImported: () => void;
+  onImportDeviceBindings: (file?: File | null) => void;
   profiles: Profile[];
 }) {
+  const bindingImportRef = useRef<HTMLInputElement>(null);
   const [sourceFilter, setSourceFilter] = useState<"all" | ProfileSource>("all");
   const filteredProfiles = sourceFilter === "all"
     ? profiles
     : profiles.filter((profile) => getProfileSource(profile) === sourceFilter);
+  const boundDevices = devices.filter((device) => device.profileId);
   const sourceCounts = {
     all: profiles.length,
     csv: profiles.filter((profile) => getProfileSource(profile) === "csv").length,
@@ -3171,7 +3257,7 @@ function ProfilesView({
       <div className="panel-header">
         <div>
           <h3>Profiles</h3>
-          <p>{filteredProfiles.length} of {profiles.length} known owners.</p>
+          <p>{filteredProfiles.length} of {profiles.length} known owners, {boundDevices.length} device bindings.</p>
         </div>
         <div className="panel-actions">
           <button className="text-button slim" disabled={importedCount === 0} onClick={onExportImported}>
@@ -3180,6 +3266,22 @@ function ProfilesView({
           <button className="text-button slim danger" disabled={importedCount === 0} onClick={onClearImported}>
             Clear CSV
           </button>
+          <button className="text-button slim" disabled={boundDevices.length === 0} onClick={onExportDeviceBindings}>
+            Export Bindings
+          </button>
+          <button className="text-button slim" onClick={() => bindingImportRef.current?.click()}>
+            Import Bindings
+          </button>
+          <input
+            accept=".csv,.tsv,text/csv,text/tab-separated-values,text/plain"
+            className="hidden-file-input"
+            onChange={(event) => {
+              onImportDeviceBindings(event.target.files?.[0]);
+              event.currentTarget.value = "";
+            }}
+            ref={bindingImportRef}
+            type="file"
+          />
           <ShieldCheck size={20} color="var(--green)" />
         </div>
       </div>
@@ -4576,6 +4678,145 @@ function toCsv(rows: string[][]) {
 
 function escapeCsvCell(value: string) {
   return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+function importDeviceBindingRows(input: string, devices: Device[], profiles: Profile[]) {
+  const rows = parseDelimitedTable(input);
+  const deviceById = new Map(devices.map((device) => [normalizeLookup(device.id), device]));
+  const deviceByMac = new Map(devices.map((device) => [normalizeMac(device.mac), device]));
+  const deviceByHostname = new Map(devices.map((device) => [normalizeLookup(device.hostname), device]));
+  const profileById = new Map(profiles.map((profile) => [normalizeLookup(profile.id), profile]));
+  const profileByEmail = new Map(
+    profiles
+      .filter((profile) => profile.email)
+      .map((profile) => [normalizeLookup(profile.email as string), profile])
+  );
+  const profileByName = new Map(profiles.map((profile) => [normalizeLookup(profile.displayName), profile]));
+  const profileOverrides: Record<string, string> = {};
+  const statusOverrides: Record<string, DeviceStatus> = {};
+  let matched = 0;
+  let skipped = 0;
+
+  for (const row of rows) {
+    const device = findImportDevice(row, deviceById, deviceByMac, deviceByHostname);
+    const profile = findImportProfile(row, profileById, profileByEmail, profileByName);
+
+    if (!device || !profile) {
+      skipped += 1;
+      continue;
+    }
+
+    profileOverrides[device.id] = profile.id;
+    statusOverrides[device.id] = "claimed";
+    matched += 1;
+  }
+
+  return {
+    matched,
+    profileOverrides,
+    skipped,
+    statusOverrides
+  };
+}
+
+function findImportDevice(
+  row: Record<string, string>,
+  byId: Map<string, Device>,
+  byMac: Map<string, Device>,
+  byHostname: Map<string, Device>
+) {
+  return (
+    byId.get(normalizeLookup(row.device_id ?? row.deviceid ?? row.id ?? "")) ??
+    byMac.get(normalizeMac(row.mac ?? row.device_mac ?? row.devicemac ?? "")) ??
+    byHostname.get(normalizeLookup(row.hostname ?? row.device_name ?? row.devicename ?? ""))
+  );
+}
+
+function findImportProfile(
+  row: Record<string, string>,
+  byId: Map<string, Profile>,
+  byEmail: Map<string, Profile>,
+  byName: Map<string, Profile>
+) {
+  return (
+    byId.get(normalizeLookup(row.profile_id ?? row.profileid ?? row.owner_id ?? row.ownerid ?? "")) ??
+    byEmail.get(normalizeLookup(row.profile_email ?? row.profileemail ?? row.email ?? row.owner_email ?? row.owneremail ?? "")) ??
+    byName.get(normalizeLookup(row.profile_name ?? row.profilename ?? row.owner ?? row.owner_name ?? row.ownername ?? ""))
+  );
+}
+
+function parseDelimitedTable(input: string) {
+  const trimmed = input.trim();
+  if (!trimmed) return [];
+
+  const delimiter = trimmed.includes("\t") ? "\t" : ",";
+  const records = parseDelimitedRecords(trimmed, delimiter);
+  const [headers = [], ...rows] = records;
+  const normalizedHeaders = headers.map((header) => normalizeImportHeader(header));
+
+  return rows.map((row) => {
+    const entry: Record<string, string> = {};
+    normalizedHeaders.forEach((header, index) => {
+      entry[header] = row[index]?.trim() ?? "";
+    });
+    return entry;
+  });
+}
+
+function parseDelimitedRecords(input: string, delimiter: string) {
+  const rows: string[][] = [];
+  let current = "";
+  let row: string[] = [];
+  let quoted = false;
+
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+    const next = input[index + 1];
+
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      index += 1;
+      continue;
+    }
+
+    if (char === '"') {
+      quoted = !quoted;
+      continue;
+    }
+
+    if (char === delimiter && !quoted) {
+      row.push(current);
+      current = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(current);
+      rows.push(row);
+      row = [];
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  row.push(current);
+  rows.push(row);
+  return rows.filter((record) => record.some((value) => value.trim()));
+}
+
+function normalizeImportHeader(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9_]+/g, "");
+}
+
+function normalizeLookup(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function normalizeMac(value: string) {
+  return value.toLowerCase().replace(/[^a-f0-9]/g, "");
 }
 
 function addActivity(setActivity: (updater: (current: ActivityEntry[]) => ActivityEntry[]) => void, message: string) {
