@@ -46,7 +46,11 @@ WhoFi should support:
 - hosted/self-hosted production mode with a persistent database, scheduled collectors, alerts, and optional captive portal
 - optional collector mode for networks where the WiFi controller is only reachable from inside the coworking LAN
 
-The current demo app includes device review, source switching, notification settings, provider readiness, usage rollups by location/SSID/AP, selectable local snapshot audit history, and optional admin authentication for hosted/live-network use.
+The current demo app includes device review, source switching, local CSV roster import, notification settings, provider readiness, usage rollups by location/SSID/AP, selectable local snapshot audit history, and optional admin authentication for hosted/live-network use.
+
+## Local Roster Import
+
+Settings includes a CSV/TSV roster importer for development and small-event workflows. Operators can paste rows with columns such as `name`, `email`, `company`, `profile_type`, and `status`, preview the parsed people/companies, then import those people into the active local profile roster. Imported profiles are stored in browser local state with the demo review state, appear in the Profiles tab, count toward the sidebar/profile mix, and can be assigned to devices in the inspector. This is a local bridge toward tenant-scoped database-backed identity sync; it is not yet the final hosted identity-provider persistence layer.
 
 ## Admin Gate
 

@@ -120,13 +120,14 @@ Deliverables:
 - identity provider interface
 - Yardi Kube connector
 - CSV/manual import
-- CSV/manual import shape endpoint and parser
+- CSV/manual import shape endpoint, parser, preview, and local active-roster import
 - normalized companies/people/contracts
 - profile link suggestions
 
 Exit criteria:
 
 - external people/companies can be synced
+- CSV people can be imported into the local roster and assigned to devices
 - email/external id can suggest profile links
 - Yardi is supported without Thinkspace hardcoding
 

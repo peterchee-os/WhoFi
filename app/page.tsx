@@ -123,11 +123,26 @@ type IntegrationTestState = {
 type CsvPreviewState = {
   status: "idle" | "previewing" | "success" | "error";
   message: string;
+  profiles?: Profile[];
   summary?: {
     companies: number;
     entitlements: number;
     people: number;
   };
+};
+type CsvIdentitySnapshotPayload = {
+  companies: Array<{
+    displayName: string;
+    externalId: string;
+  }>;
+  people: Array<{
+    companyExternalId?: string;
+    displayName: string;
+    email?: string;
+    externalId: string;
+    profileHint?: Profile["profileType"];
+    status?: "active" | "inactive" | "unknown";
+  }>;
 };
 
 type NetworkProviderConfigStatus = {
@@ -158,6 +173,7 @@ type ReviewState = {
   activity: ActivityEntry[];
   alertStatusOverrides: Record<string, AlertStatus>;
   emailDeliveries: EmailDelivery[];
+  importedProfiles?: Profile[];
   notificationSettings: NotificationSettings;
   profileOverrides: Record<string, string | undefined>;
   riskOverrides: Record<string, RiskState>;
@@ -187,14 +203,6 @@ const deviceSourceOptions: Array<{ id: DeviceSnapshotSource; label: string }> = 
 ];
 
 const reviewStateKey = "whofi.demo.reviewState";
-
-const profileById = new Map(demoProfiles.map((profile) => [profile.id, profile]));
-const ownerMix = [
-  { label: "Guests", value: demoProfiles.filter((profile) => ["guest", "drop_in"].includes(profile.profileType)).length },
-  { label: "Members", value: demoProfiles.filter((profile) => profile.profileType === "customer").length },
-  { label: "Staff", value: demoProfiles.filter((profile) => profile.profileType === "staff").length },
-  { label: "Agents", value: demoProfiles.filter((profile) => profile.profileType === "agent").length }
-];
 
 const viewTitles: Record<View, { title: string; subtitle: string }> = {
   dashboard: {
@@ -342,6 +350,7 @@ export default function Home() {
   });
   const [notificationSettings, setNotificationSettings] = useState(defaultNotificationSettings);
   const [emailDeliveries, setEmailDeliveries] = useState(seededEmailDeliveries);
+  const [importedProfiles, setImportedProfiles] = useState<Profile[]>([]);
   const [profileOverrides, setProfileOverrides] = useState<Record<string, string | undefined>>({});
   const [statusOverrides, setStatusOverrides] = useState<Record<string, DeviceStatus>>({});
   const [riskOverrides, setRiskOverrides] = useState<Record<string, RiskState>>({});
@@ -363,6 +372,7 @@ export default function Home() {
         setActivity(parsed.activity ?? []);
         setAlertStatusOverrides(parsed.alertStatusOverrides ?? {});
         setEmailDeliveries(parsed.emailDeliveries ?? seededEmailDeliveries);
+        setImportedProfiles(parsed.importedProfiles ?? []);
         setNotificationSettings(mergeNotificationSettings(parsed.notificationSettings));
         setProfileOverrides(parsed.profileOverrides ?? {});
         setRiskOverrides(parsed.riskOverrides ?? {});
@@ -392,6 +402,7 @@ export default function Home() {
       activity,
       alertStatusOverrides,
       emailDeliveries,
+      importedProfiles,
       notificationSettings,
       profileOverrides,
       riskOverrides,
@@ -403,6 +414,7 @@ export default function Home() {
     activity,
     alertStatusOverrides,
     emailDeliveries,
+    importedProfiles,
     notificationSettings,
     profileOverrides,
     riskOverrides,
@@ -562,6 +574,9 @@ export default function Home() {
       riskState: riskOverrides[device.id] ?? device.riskState
     }));
   }, [profileOverrides, riskOverrides, sourceDevices, statusOverrides]);
+  const profiles = useMemo(() => mergeProfiles(demoProfiles, importedProfiles), [importedProfiles]);
+  const profileById = useMemo(() => new Map(profiles.map((profile) => [profile.id, profile])), [profiles]);
+  const ownerMix = useMemo(() => getOwnerMix(profiles), [profiles]);
 
   const alerts = useMemo(() => {
     return demoAlerts.map((alert) => ({
@@ -581,7 +596,7 @@ export default function Home() {
     [deviceSnapshotSource, devices, snapshotObservedAt]
   );
   const maxUsage = useMemo(() => Math.max(0, ...devices.map((device) => device.rxBytes + device.txBytes)), [devices]);
-  const resolutions = useMemo(() => resolveDevices(devices, demoProfiles), [devices]);
+  const resolutions = useMemo(() => resolveDevices(devices, profiles), [devices, profiles]);
   const resolutionByDeviceId = useMemo(
     () => new Map(resolutions.map((resolution) => [resolution.deviceId, resolution])),
     [resolutions]
@@ -607,7 +622,7 @@ export default function Home() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalizedQuery));
     });
-  }, [devices, query]);
+  }, [devices, profileById, query]);
 
   const title = viewTitles[activeView];
   const selectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? devices[0];
@@ -1341,6 +1356,17 @@ export default function Home() {
     addActivity(setActivity, `Assigned ${getDeviceLabel(deviceId, devices)} to ${profile?.displayName ?? "owner"}`);
   };
 
+  const importCsvProfiles = (nextProfiles: Profile[]) => {
+    if (nextProfiles.length === 0) {
+      setNotice("No profiles imported");
+      return;
+    }
+
+    setImportedProfiles((current) => mergeProfiles(current, nextProfiles));
+    setNotice("Roster imported");
+    addActivity(setActivity, `Imported ${nextProfiles.length} CSV roster ${nextProfiles.length === 1 ? "profile" : "profiles"}`);
+  };
+
   const setDeviceRisk = (deviceId: string, riskState: RiskState) => {
     setRiskOverrides((current) => ({ ...current, [deviceId]: riskState }));
     setNotice(riskState === "normal" ? "Marked reviewed" : "Device updated");
@@ -1372,6 +1398,7 @@ export default function Home() {
     setActivity(initialActivity);
     setAlertStatusOverrides({});
     setEmailDeliveries(seededEmailDeliveries);
+    setImportedProfiles([]);
     setNotificationSettings(defaultNotificationSettings);
     setProfileOverrides({});
     setRiskOverrides({});
@@ -1415,12 +1442,14 @@ export default function Home() {
       exportedAt: new Date().toISOString(),
       notificationSettings,
       emailDeliveries,
+      importedProfiles,
       snapshotHistory,
-      profiles: demoProfiles,
+      profiles,
       reviewState: {
         activity,
         alertStatusOverrides,
         emailDeliveries,
+        importedProfiles,
         notificationSettings,
         profileOverrides,
         riskOverrides,
@@ -1485,7 +1514,7 @@ export default function Home() {
 
         <div className="sidebar-section">
           <p>Current snapshot</p>
-          <p>{metrics.onlineDevices} devices, {demoProfiles.length} profiles, {metrics.reviewSignals} review signals.</p>
+          <p>{metrics.onlineDevices} devices, {profiles.length} profiles, {metrics.reviewSignals} review signals.</p>
         </div>
       </aside>
 
@@ -1558,6 +1587,9 @@ export default function Home() {
             onSelectDevice={setSelectedDeviceId}
             onSetDeviceRisk={setDeviceRisk}
             onSetAlertStatus={setAlertStatus}
+            ownerMix={ownerMix}
+            profileById={profileById}
+            profiles={profiles}
             activity={activity}
             alerts={alerts}
             resolutionByDeviceId={resolutionByDeviceId}
@@ -1573,6 +1605,8 @@ export default function Home() {
             onBlockDevice={blockDevice}
             onSelectDevice={setSelectedDeviceId}
             onSetDeviceRisk={setDeviceRisk}
+            profileById={profileById}
+            profiles={profiles}
             resolutionByDeviceId={resolutionByDeviceId}
             selectedDeviceId={selectedDeviceId}
           />
@@ -1618,13 +1652,14 @@ export default function Home() {
             snapshotStorageLimits={snapshotStorageLimits}
           />
         ) : null}
-        {activeView === "profiles" ? <ProfilesView profiles={demoProfiles} /> : null}
+        {activeView === "profiles" ? <ProfilesView profiles={profiles} /> : null}
         {activeView === "alerts" ? <AlertsView alerts={alerts} onSetAlertStatus={setAlertStatus} /> : null}
         {activeView === "settings" ? (
           <SettingsView
             deliveries={emailDeliveries}
             onAddActivity={(message) => addActivity(setActivity, message)}
             onDelivery={(delivery) => setEmailDeliveries((current) => [delivery, ...current].slice(0, 12))}
+            onImportProfiles={importCsvProfiles}
             onNotice={setNotice}
             onReset={() => {
               setNotificationSettings(defaultNotificationSettings);
@@ -1790,6 +1825,9 @@ function DashboardView({
   onSelectDevice,
   onSetAlertStatus,
   onSetDeviceRisk,
+  ownerMix,
+  profileById,
+  profiles,
   resolutionByDeviceId,
   selectedDevice,
   selectedDeviceId
@@ -1803,6 +1841,9 @@ function DashboardView({
   onSelectDevice: (deviceId: string) => void;
   onSetAlertStatus: (alertId: string, status: AlertStatus) => void;
   onSetDeviceRisk: (deviceId: string, riskState: RiskState) => void;
+  ownerMix: Array<{ label: string; value: number }>;
+  profileById: Map<string, Profile>;
+  profiles: Profile[];
   resolutionByDeviceId: Map<string, DeviceResolution>;
   selectedDevice: Device;
   selectedDeviceId: string;
@@ -1816,6 +1857,7 @@ function DashboardView({
         onSelectDevice={onSelectDevice}
         resolutionByDeviceId={resolutionByDeviceId}
         selectedDeviceId={selectedDeviceId}
+        profileById={profileById}
       />
 
       <div className="side-stack">
@@ -1824,9 +1866,11 @@ function DashboardView({
           onAssignDevice={onAssignDevice}
           onBlockDevice={onBlockDevice}
           onSetDeviceRisk={onSetDeviceRisk}
+          profileById={profileById}
+          profiles={profiles}
           resolution={resolutionByDeviceId.get(selectedDevice.id)}
         />
-        <OwnerMix />
+        <OwnerMix ownerMix={ownerMix} />
         <AlertQueue alerts={alerts} limit={3} onSetAlertStatus={onSetAlertStatus} />
         <ActivityLog activity={activity} />
       </div>
@@ -1841,6 +1885,8 @@ function DevicesView({
   onBlockDevice,
   onSelectDevice,
   onSetDeviceRisk,
+  profileById,
+  profiles,
   resolutionByDeviceId,
   selectedDeviceId
 }: {
@@ -1850,6 +1896,8 @@ function DevicesView({
   onBlockDevice: (deviceId: string) => void;
   onSelectDevice: (deviceId: string) => void;
   onSetDeviceRisk: (deviceId: string, riskState: RiskState) => void;
+  profileById: Map<string, Profile>;
+  profiles: Profile[];
   resolutionByDeviceId: Map<string, DeviceResolution>;
   selectedDeviceId: string;
 }) {
@@ -1861,6 +1909,7 @@ function DevicesView({
         devices={devices}
         maxUsage={maxUsage}
         onSelectDevice={onSelectDevice}
+        profileById={profileById}
         resolutionByDeviceId={resolutionByDeviceId}
         selectedDeviceId={selectedDeviceId}
       />
@@ -1871,6 +1920,8 @@ function DevicesView({
             onAssignDevice={onAssignDevice}
             onBlockDevice={onBlockDevice}
             onSetDeviceRisk={onSetDeviceRisk}
+            profileById={profileById}
+            profiles={profiles}
             resolution={resolutionByDeviceId.get(selectedDevice.id)}
           />
         ) : (
@@ -2932,6 +2983,7 @@ function SettingsView({
   deliveries,
   onAddActivity,
   onDelivery,
+  onImportProfiles,
   onNotice,
   onReset,
   onSettingsChange,
@@ -2940,6 +2992,7 @@ function SettingsView({
   deliveries: EmailDelivery[];
   onAddActivity: (message: string) => void;
   onDelivery: (delivery: EmailDelivery) => void;
+  onImportProfiles: (profiles: Profile[]) => void;
   onNotice: (notice: string) => void;
   onReset: () => void;
   onSettingsChange: (settings: NotificationSettings) => void;
@@ -3135,7 +3188,7 @@ function SettingsView({
       <div className="side-stack">
         <IntegrationCards onAddActivity={onAddActivity} onNotice={onNotice} />
         <NetworkProviderStatus onAddActivity={onAddActivity} onNotice={onNotice} />
-        <CsvImportPreview onAddActivity={onAddActivity} onNotice={onNotice} />
+        <CsvImportPreview onAddActivity={onAddActivity} onImportProfiles={onImportProfiles} onNotice={onNotice} />
 
         <section className="panel">
           <div className="panel-header">
@@ -3573,9 +3626,11 @@ function NetworkProviderStatus({
 
 function CsvImportPreview({
   onAddActivity,
+  onImportProfiles,
   onNotice
 }: {
   onAddActivity: (message: string) => void;
+  onImportProfiles: (profiles: Profile[]) => void;
   onNotice: (notice: string) => void;
 }) {
   const [input, setInput] = useState("name,email,company,profile_type,status\nExample Guest,guest@example.test,Example Team,guest,registered");
@@ -3598,11 +3653,18 @@ function CsvImportPreview({
         },
         method: "POST"
       });
-      const payload = await response.json();
+      const payload = (await response.json()) as {
+        error?: string;
+        snapshot?: CsvIdentitySnapshotPayload;
+        summary?: CsvPreviewState["summary"];
+      };
       if (!response.ok) throw new Error(payload.error ?? `HTTP ${response.status}`);
+      if (!payload.summary || !payload.snapshot) throw new Error("CSV preview response incomplete");
+      const profiles = csvSnapshotToProfiles(payload.snapshot);
 
       setPreview({
         message: `${payload.summary.people} people, ${payload.summary.companies} companies`,
+        profiles,
         status: "success",
         summary: payload.summary
       });
@@ -3631,7 +3693,16 @@ function CsvImportPreview({
       <div className="import-preview">
         <label className="select-field">
           <span>CSV or TSV</span>
-          <textarea value={input} onChange={(event) => setInput(event.target.value)} />
+          <textarea
+            value={input}
+            onChange={(event) => {
+              setInput(event.target.value);
+              setPreview({
+                message: "Not previewed",
+                status: "idle"
+              });
+            }}
+          />
         </label>
         <div className="integration-title">
           <span className={`integration-state ${preview.status === "previewing" ? "testing" : preview.status}`}>{preview.message}</span>
@@ -3639,6 +3710,22 @@ function CsvImportPreview({
         <button className="text-button" onClick={runPreview} title="Preview import">
           <Eye size={17} />
           Preview
+        </button>
+        <button
+          className="text-button primary"
+          disabled={!preview.profiles?.length}
+          onClick={() => {
+            const profiles = preview.profiles ?? [];
+            onImportProfiles(profiles);
+            setPreview((current) => ({
+              ...current,
+              message: `Imported ${profiles.length} profiles`
+            }));
+          }}
+          title="Import previewed roster"
+        >
+          <UserPlus size={17} />
+          Import Roster
         </button>
       </div>
     </section>
@@ -3650,6 +3737,7 @@ function DeviceLedger({
   compact = false,
   maxUsage,
   onSelectDevice,
+  profileById,
   resolutionByDeviceId,
   selectedDeviceId
 }: {
@@ -3657,6 +3745,7 @@ function DeviceLedger({
   compact?: boolean;
   maxUsage: number;
   onSelectDevice: (deviceId: string) => void;
+  profileById: Map<string, Profile>;
   resolutionByDeviceId: Map<string, DeviceResolution>;
   selectedDeviceId: string;
 }) {
@@ -3753,22 +3842,27 @@ function DeviceInspector({
   onAssignDevice,
   onBlockDevice,
   onSetDeviceRisk,
+  profileById,
+  profiles,
   resolution
 }: {
   device: Device;
   onAssignDevice: (deviceId: string, profileId: string) => void;
   onBlockDevice: (deviceId: string) => void;
   onSetDeviceRisk: (deviceId: string, riskState: RiskState) => void;
+  profileById: Map<string, Profile>;
+  profiles: Profile[];
   resolution?: DeviceResolution;
 }) {
-  const [selectedProfileId, setSelectedProfileId] = useState(device.profileId ?? demoProfiles[0].id);
+  const fallbackProfileId = profiles[0]?.id ?? "";
+  const [selectedProfileId, setSelectedProfileId] = useState(device.profileId ?? fallbackProfileId);
   const profile = device.profileId ? profileById.get(device.profileId) : undefined;
   const usage = device.rxBytes + device.txBytes;
-  const assignProfileId = selectedProfileId || demoProfiles[0].id;
+  const assignProfileId = selectedProfileId || fallbackProfileId;
 
   useEffect(() => {
-    setSelectedProfileId(device.profileId ?? demoProfiles[0].id);
-  }, [device.id, device.profileId]);
+    setSelectedProfileId(device.profileId ?? fallbackProfileId);
+  }, [device.id, device.profileId, fallbackProfileId]);
 
   return (
     <section className="panel">
@@ -3802,7 +3896,7 @@ function DeviceInspector({
         <label className="select-field">
           <span>Owner</span>
           <select value={selectedProfileId} onChange={(event) => setSelectedProfileId(event.target.value)}>
-            {demoProfiles.map((candidate) => (
+            {profiles.map((candidate) => (
               <option key={candidate.id} value={candidate.id}>
                 {candidate.displayName}
               </option>
@@ -3838,7 +3932,12 @@ function DeviceInspector({
         </dl>
 
         <div className="action-grid">
-          <button className="text-button" onClick={() => onAssignDevice(device.id, assignProfileId)} title="Assign owner">
+          <button
+            className="text-button"
+            disabled={!assignProfileId}
+            onClick={() => onAssignDevice(device.id, assignProfileId)}
+            title="Assign owner"
+          >
             <UserPlus size={17} />
             Assign
           </button>
@@ -3870,7 +3969,7 @@ function EmptyPanel() {
   );
 }
 
-function OwnerMix() {
+function OwnerMix({ ownerMix }: { ownerMix: Array<{ label: string; value: number }> }) {
   return (
     <section className="panel">
       <div className="panel-header">
@@ -4002,6 +4101,50 @@ function createEmailDelivery({
     recipient,
     status
   };
+}
+
+function csvSnapshotToProfiles(snapshot: CsvIdentitySnapshotPayload): Profile[] {
+  const companyById = new Map(snapshot.companies.map((company) => [company.externalId, company.displayName]));
+  const now = new Date().toISOString();
+
+  return snapshot.people.map((person) => ({
+    displayName: person.displayName,
+    email: person.email,
+    id: `csv-${slugifyProfileId(person.externalId || person.email || person.displayName)}`,
+    lastSeen: now,
+    organizationName: person.companyExternalId ? companyById.get(person.companyExternalId) : undefined,
+    profileLevel: person.status === "active" ? "verified" : "seen",
+    profileType: person.profileHint ?? "unknown"
+  }));
+}
+
+function mergeProfiles(base: Profile[], incoming: Profile[]) {
+  const byId = new Map<string, Profile>();
+  for (const profile of [...base, ...incoming]) {
+    byId.set(profile.id, profile);
+  }
+  return Array.from(byId.values()).sort((a, b) => {
+    const typeOrder = profileTypeSortOrder(a.profileType) - profileTypeSortOrder(b.profileType);
+    return typeOrder || a.displayName.localeCompare(b.displayName);
+  });
+}
+
+function getOwnerMix(profiles: Profile[]) {
+  return [
+    { label: "Guests", value: profiles.filter((profile) => ["guest", "drop_in", "event_attendee"].includes(profile.profileType)).length },
+    { label: "Members", value: profiles.filter((profile) => profile.profileType === "customer").length },
+    { label: "Staff", value: profiles.filter((profile) => profile.profileType === "staff").length },
+    { label: "Agents", value: profiles.filter((profile) => profile.profileType === "agent").length }
+  ];
+}
+
+function profileTypeSortOrder(profileType: Profile["profileType"]) {
+  const order: Profile["profileType"][] = ["staff", "agent", "customer", "guest", "event_attendee", "drop_in", "vendor", "machine", "unknown"];
+  return order.indexOf(profileType);
+}
+
+function slugifyProfileId(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "profile";
 }
 
 function addActivity(setActivity: (updater: (current: ActivityEntry[]) => ActivityEntry[]) => void, message: string) {
