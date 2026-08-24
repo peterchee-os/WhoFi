@@ -70,6 +70,16 @@ type PendingSnapshotArchiveImport = {
   fileName: string;
   summary: SnapshotArchiveImportSummary;
 };
+type DeviceBindingImportSummary = {
+  matched: number;
+  profileOverrides: Record<string, string>;
+  skipped: number;
+  statusOverrides: Record<string, DeviceStatus>;
+};
+type PendingDeviceBindingImport = {
+  fileName: string;
+  summary: DeviceBindingImportSummary;
+};
 type NotificationProviderMode = "disabled" | "console" | "resend";
 type EmailDeliveryStatus = "sent" | "failed" | "disabled" | "rendered";
 type NotificationRuleKey =
@@ -346,6 +356,7 @@ export default function Home() {
     status: "idle"
   });
   const [pendingSnapshotArchiveImport, setPendingSnapshotArchiveImport] = useState<PendingSnapshotArchiveImport>();
+  const [pendingDeviceBindingImport, setPendingDeviceBindingImport] = useState<PendingDeviceBindingImport>();
   const [adminAuth, setAdminAuth] = useState<AdminAuthState>({
     authenticated: false,
     configured: false,
@@ -1504,29 +1515,46 @@ export default function Home() {
       const text = await file.text();
       const summary = importDeviceBindingRows(text, devices, profiles);
       if (summary.matched === 0) {
-        setNotice("No bindings imported");
-        addActivity(setActivity, `Device binding import skipped ${summary.skipped} rows`);
+        setPendingDeviceBindingImport(undefined);
+        setNotice("No binding matches");
+        addActivity(setActivity, `Device binding import preview skipped ${summary.skipped} rows`);
         return;
       }
 
-      setProfileOverrides((current) => ({
-        ...current,
-        ...summary.profileOverrides
-      }));
-      setStatusOverrides((current) => ({
-        ...current,
-        ...summary.statusOverrides
-      }));
-      setNotice("Bindings imported");
-      addActivity(
-        setActivity,
-        `Imported ${summary.matched} device owner ${summary.matched === 1 ? "binding" : "bindings"} (${summary.skipped} skipped)`
-      );
+      setPendingDeviceBindingImport({
+        fileName: file.name,
+        summary
+      });
+      setNotice("Binding import previewed");
+      addActivity(setActivity, `Previewed ${summary.matched} device owner ${summary.matched === 1 ? "binding" : "bindings"} (${summary.skipped} skipped)`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Binding import failed";
       setNotice("Binding import failed");
       addActivity(setActivity, `Device binding import failed: ${message}`);
     }
+  };
+
+  const confirmDeviceBindingImport = () => {
+    if (!pendingDeviceBindingImport) {
+      setNotice("No binding import pending");
+      return;
+    }
+
+    const { summary } = pendingDeviceBindingImport;
+    setProfileOverrides((current) => ({
+      ...current,
+      ...summary.profileOverrides
+    }));
+    setStatusOverrides((current) => ({
+      ...current,
+      ...summary.statusOverrides
+    }));
+    setPendingDeviceBindingImport(undefined);
+    setNotice("Bindings imported");
+    addActivity(
+      setActivity,
+      `Imported ${summary.matched} device owner ${summary.matched === 1 ? "binding" : "bindings"} (${summary.skipped} skipped)`
+    );
   };
 
   const importCsvProfiles = (nextProfiles: Profile[]) => {
@@ -1878,10 +1906,13 @@ export default function Home() {
           <ProfilesView
             devices={devices}
             importedCount={importedProfiles.length}
+            onCancelDeviceBindingImport={() => setPendingDeviceBindingImport(undefined)}
             onClearImported={clearImportedProfiles}
+            onConfirmDeviceBindingImport={confirmDeviceBindingImport}
             onExportDeviceBindings={exportDeviceBindings}
             onExportImported={exportImportedProfiles}
             onImportDeviceBindings={importDeviceBindings}
+            pendingDeviceBindingImport={pendingDeviceBindingImport}
             profiles={profiles}
           />
         ) : null}
@@ -3226,18 +3257,24 @@ function DeviceChangeList({
 function ProfilesView({
   devices,
   importedCount,
+  onCancelDeviceBindingImport,
   onClearImported,
+  onConfirmDeviceBindingImport,
   onExportDeviceBindings,
   onExportImported,
   onImportDeviceBindings,
+  pendingDeviceBindingImport,
   profiles
 }: {
   devices: Device[];
   importedCount: number;
+  onCancelDeviceBindingImport: () => void;
   onClearImported: () => void;
+  onConfirmDeviceBindingImport: () => void;
   onExportDeviceBindings: () => void;
   onExportImported: () => void;
   onImportDeviceBindings: (file?: File | null) => void;
+  pendingDeviceBindingImport?: PendingDeviceBindingImport;
   profiles: Profile[];
 }) {
   const bindingImportRef = useRef<HTMLInputElement>(null);
@@ -3298,6 +3335,13 @@ function ProfilesView({
           </button>
         ))}
       </div>
+      {pendingDeviceBindingImport ? (
+        <DeviceBindingImportPreview
+          onCancel={onCancelDeviceBindingImport}
+          onConfirm={onConfirmDeviceBindingImport}
+          pendingImport={pendingDeviceBindingImport}
+        />
+      ) : null}
       <div className="profile-grid wide">
         {filteredProfiles.map((profile) => (
           <div className="profile-card" key={profile.id}>
@@ -3317,6 +3361,46 @@ function ProfilesView({
         ) : null}
       </div>
     </section>
+  );
+}
+
+function DeviceBindingImportPreview({
+  onCancel,
+  onConfirm,
+  pendingImport
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+  pendingImport: PendingDeviceBindingImport;
+}) {
+  return (
+    <div className="archive-import-preview">
+      <div>
+        <strong>Binding Import Preview</strong>
+        <span>{pendingImport.fileName}</span>
+      </div>
+      <div className="review-queue-summary">
+        <div>
+          <span>Matched</span>
+          <strong>{pendingImport.summary.matched}</strong>
+        </div>
+        <div>
+          <span>Skipped</span>
+          <strong>{pendingImport.summary.skipped}</strong>
+        </div>
+      </div>
+      <p>
+        Confirming will assign matched devices to matched profiles in local review state. Skipped rows were not written.
+      </p>
+      <div className="archive-import-actions">
+        <button className="text-button slim" onClick={onCancel} type="button">
+          Cancel
+        </button>
+        <button className="text-button slim primary" onClick={onConfirm} type="button">
+          Confirm Import
+        </button>
+      </div>
+    </div>
   );
 }
 

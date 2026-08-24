@@ -130,7 +130,7 @@ Exit criteria:
 - external people/companies can be synced
 - CSV people can be imported into the local roster and assigned to devices
 - hostname/person/org evidence can suggest profile links for individual or visible-batch operator review, including ignored false-positive handling
-- staff can export and re-import reviewed device owner bindings during local/demo workflows
+- staff can export and preview/re-import reviewed device owner bindings during local/demo workflows
 - email/external id can suggest profile links
 - Yardi is supported without Thinkspace hardcoding
 

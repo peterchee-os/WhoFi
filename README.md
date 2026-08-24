@@ -54,7 +54,7 @@ Settings includes a CSV/TSV roster importer for development and small-event work
 
 Imported and demo profiles also feed local profile-link suggestions. When an unclaimed device hostname appears to match a known person, team, or organization, the ledger and inspector surface the suggested owner, the inspector offers an `Assign Suggested` action, and the Dashboard/Devices views show a Profile Suggestions queue with source filters plus visible-batch assign/ignore/export actions. Ignored false-positive suggestions persist in browser-local review state and can be restored. These suggestions are evidence for operator review, not automatic ownership claims.
 
-The Profiles tab can also export current device owner bindings and import CSV/TSV bindings back into the local review state. Binding import matches devices by `device_id`, `mac`, or `hostname`, and profiles by `profile_id`, `profile_email`, or `profile_name`. This is meant for operator handoff and demo recovery; it is not a replacement for database-backed device/profile binding persistence.
+The Profiles tab can also export current device owner bindings and import CSV/TSV bindings back into the local review state after a preview/confirm step. Binding import matches devices by `device_id`, `mac`, or `hostname`, and profiles by `profile_id`, `profile_email`, or `profile_name`. This is meant for operator handoff and demo recovery; it is not a replacement for database-backed device/profile binding persistence.
 
 ## Admin Gate
 
