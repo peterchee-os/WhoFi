@@ -174,6 +174,7 @@ type ReviewState = {
   activity: ActivityEntry[];
   alertStatusOverrides: Record<string, AlertStatus>;
   emailDeliveries: EmailDelivery[];
+  ignoredProfileSuggestionIds?: string[];
   importedProfiles?: Profile[];
   notificationSettings: NotificationSettings;
   profileOverrides: Record<string, string | undefined>;
@@ -192,6 +193,7 @@ type ProfileSuggestionQueueItem = {
   confidence: DeviceResolution["confidence"];
   confidenceScore: number;
   device: Device;
+  id: string;
   profile: Profile;
   profileSource: ProfileSource;
   reason: string;
@@ -361,6 +363,7 @@ export default function Home() {
   });
   const [notificationSettings, setNotificationSettings] = useState(defaultNotificationSettings);
   const [emailDeliveries, setEmailDeliveries] = useState(seededEmailDeliveries);
+  const [ignoredProfileSuggestionIds, setIgnoredProfileSuggestionIds] = useState<string[]>([]);
   const [importedProfiles, setImportedProfiles] = useState<Profile[]>([]);
   const [profileOverrides, setProfileOverrides] = useState<Record<string, string | undefined>>({});
   const [statusOverrides, setStatusOverrides] = useState<Record<string, DeviceStatus>>({});
@@ -383,6 +386,7 @@ export default function Home() {
         setActivity(parsed.activity ?? []);
         setAlertStatusOverrides(parsed.alertStatusOverrides ?? {});
         setEmailDeliveries(parsed.emailDeliveries ?? seededEmailDeliveries);
+        setIgnoredProfileSuggestionIds(parsed.ignoredProfileSuggestionIds ?? []);
         setImportedProfiles(parsed.importedProfiles ?? []);
         setNotificationSettings(mergeNotificationSettings(parsed.notificationSettings));
         setProfileOverrides(parsed.profileOverrides ?? {});
@@ -413,6 +417,7 @@ export default function Home() {
       activity,
       alertStatusOverrides,
       emailDeliveries,
+      ignoredProfileSuggestionIds,
       importedProfiles,
       notificationSettings,
       profileOverrides,
@@ -425,6 +430,7 @@ export default function Home() {
     activity,
     alertStatusOverrides,
     emailDeliveries,
+    ignoredProfileSuggestionIds,
     importedProfiles,
     notificationSettings,
     profileOverrides,
@@ -612,10 +618,15 @@ export default function Home() {
     () => new Map(resolutions.map((resolution) => [resolution.deviceId, resolution])),
     [resolutions]
   );
-  const profileSuggestionQueue = useMemo(
+  const allProfileSuggestionQueue = useMemo(
     () => buildProfileSuggestionQueue(devices, resolutionByDeviceId, profileById),
     [devices, profileById, resolutionByDeviceId]
   );
+  const profileSuggestionQueue = useMemo(
+    () => allProfileSuggestionQueue.filter((item) => !ignoredProfileSuggestionIds.includes(item.id)),
+    [allProfileSuggestionQueue, ignoredProfileSuggestionIds]
+  );
+  const ignoredProfileSuggestionCount = allProfileSuggestionQueue.length - profileSuggestionQueue.length;
 
   const filteredDevices = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -1389,6 +1400,27 @@ export default function Home() {
     addActivity(setActivity, `Assigned ${items.length} suggested ${items.length === 1 ? "owner" : "owners"}`);
   };
 
+  const ignoreProfileSuggestions = (items: ProfileSuggestionQueueItem[]) => {
+    if (items.length === 0) {
+      setNotice("No suggestions selected");
+      return;
+    }
+
+    const ids = items.map((item) => item.id);
+    setIgnoredProfileSuggestionIds((current) => Array.from(new Set([...current, ...ids])));
+    setNotice("Suggestions ignored");
+    addActivity(setActivity, `Ignored ${items.length} profile ${items.length === 1 ? "suggestion" : "suggestions"}`);
+  };
+
+  const restoreIgnoredProfileSuggestions = () => {
+    const count = ignoredProfileSuggestionCount;
+    setIgnoredProfileSuggestionIds([]);
+    setNotice(count ? "Ignored suggestions restored" : "No ignored suggestions");
+    if (count) {
+      addActivity(setActivity, `Restored ${count} ignored profile ${count === 1 ? "suggestion" : "suggestions"}`);
+    }
+  };
+
   const importCsvProfiles = (nextProfiles: Profile[]) => {
     if (nextProfiles.length === 0) {
       setNotice("No profiles imported");
@@ -1465,6 +1497,7 @@ export default function Home() {
     setActivity(initialActivity);
     setAlertStatusOverrides({});
     setEmailDeliveries(seededEmailDeliveries);
+    setIgnoredProfileSuggestionIds([]);
     setImportedProfiles([]);
     setNotificationSettings(defaultNotificationSettings);
     setProfileOverrides({});
@@ -1649,9 +1682,12 @@ export default function Home() {
           <DashboardView
             devices={filteredDevices}
             maxUsage={maxUsage}
+            ignoredProfileSuggestionCount={ignoredProfileSuggestionCount}
             onAssignDevice={assignDevice}
             onBlockDevice={blockDevice}
             onBulkAssignSuggestions={assignSuggestedProfiles}
+            onIgnoreSuggestions={ignoreProfileSuggestions}
+            onRestoreIgnoredSuggestions={restoreIgnoredProfileSuggestions}
             onSelectDevice={setSelectedDeviceId}
             onSetDeviceRisk={setDeviceRisk}
             onSetAlertStatus={setAlertStatus}
@@ -1670,9 +1706,12 @@ export default function Home() {
           <DevicesView
             devices={filteredDevices}
             maxUsage={maxUsage}
+            ignoredProfileSuggestionCount={ignoredProfileSuggestionCount}
             onAssignDevice={assignDevice}
             onBlockDevice={blockDevice}
             onBulkAssignSuggestions={assignSuggestedProfiles}
+            onIgnoreSuggestions={ignoreProfileSuggestions}
+            onRestoreIgnoredSuggestions={restoreIgnoredProfileSuggestions}
             onSelectDevice={setSelectedDeviceId}
             onSetDeviceRisk={setDeviceRisk}
             profileById={profileById}
@@ -1897,10 +1936,13 @@ function DashboardView({
   activity,
   alerts,
   devices,
+  ignoredProfileSuggestionCount,
   maxUsage,
   onAssignDevice,
   onBlockDevice,
   onBulkAssignSuggestions,
+  onIgnoreSuggestions,
+  onRestoreIgnoredSuggestions,
   onSelectDevice,
   onSetAlertStatus,
   onSetDeviceRisk,
@@ -1915,10 +1957,13 @@ function DashboardView({
   activity: ActivityEntry[];
   alerts: Alert[];
   devices: Device[];
+  ignoredProfileSuggestionCount: number;
   maxUsage: number;
   onAssignDevice: (deviceId: string, profileId: string) => void;
   onBlockDevice: (deviceId: string) => void;
   onBulkAssignSuggestions: (items: ProfileSuggestionQueueItem[]) => void;
+  onIgnoreSuggestions: (items: ProfileSuggestionQueueItem[]) => void;
+  onRestoreIgnoredSuggestions: () => void;
   onSelectDevice: (deviceId: string) => void;
   onSetAlertStatus: (alertId: string, status: AlertStatus) => void;
   onSetDeviceRisk: (deviceId: string, riskState: RiskState) => void;
@@ -1953,10 +1998,13 @@ function DashboardView({
           resolution={resolutionByDeviceId.get(selectedDevice.id)}
         />
         <ProfileSuggestionQueue
+          ignoredCount={ignoredProfileSuggestionCount}
           items={profileSuggestionQueue}
           limit={4}
           onAssign={(item) => onAssignDevice(item.device.id, item.profile.id)}
           onBulkAssign={onBulkAssignSuggestions}
+          onBulkIgnore={onIgnoreSuggestions}
+          onRestoreIgnored={onRestoreIgnoredSuggestions}
           onSelectDevice={onSelectDevice}
         />
         <OwnerMix ownerMix={ownerMix} />
@@ -1969,10 +2017,13 @@ function DashboardView({
 
 function DevicesView({
   devices,
+  ignoredProfileSuggestionCount,
   maxUsage,
   onAssignDevice,
   onBlockDevice,
   onBulkAssignSuggestions,
+  onIgnoreSuggestions,
+  onRestoreIgnoredSuggestions,
   onSelectDevice,
   onSetDeviceRisk,
   profileById,
@@ -1982,10 +2033,13 @@ function DevicesView({
   selectedDeviceId
 }: {
   devices: Device[];
+  ignoredProfileSuggestionCount: number;
   maxUsage: number;
   onAssignDevice: (deviceId: string, profileId: string) => void;
   onBlockDevice: (deviceId: string) => void;
   onBulkAssignSuggestions: (items: ProfileSuggestionQueueItem[]) => void;
+  onIgnoreSuggestions: (items: ProfileSuggestionQueueItem[]) => void;
+  onRestoreIgnoredSuggestions: () => void;
   onSelectDevice: (deviceId: string) => void;
   onSetDeviceRisk: (deviceId: string, riskState: RiskState) => void;
   profileById: Map<string, Profile>;
@@ -2021,9 +2075,12 @@ function DevicesView({
           <EmptyPanel />
         )}
         <ProfileSuggestionQueue
+          ignoredCount={ignoredProfileSuggestionCount}
           items={profileSuggestionQueue}
           onAssign={(item) => onAssignDevice(item.device.id, item.profile.id)}
           onBulkAssign={onBulkAssignSuggestions}
+          onBulkIgnore={onIgnoreSuggestions}
+          onRestoreIgnored={onRestoreIgnoredSuggestions}
           onSelectDevice={onSelectDevice}
         />
       </div>
@@ -4134,16 +4191,22 @@ function EmptyPanel() {
 }
 
 function ProfileSuggestionQueue({
+  ignoredCount,
   items,
   limit,
   onAssign,
   onBulkAssign,
+  onBulkIgnore,
+  onRestoreIgnored,
   onSelectDevice
 }: {
+  ignoredCount: number;
   items: ProfileSuggestionQueueItem[];
   limit?: number;
   onAssign: (item: ProfileSuggestionQueueItem) => void;
   onBulkAssign: (items: ProfileSuggestionQueueItem[]) => void;
+  onBulkIgnore: (items: ProfileSuggestionQueueItem[]) => void;
+  onRestoreIgnored: () => void;
   onSelectDevice: (deviceId: string) => void;
 }) {
   const [sourceFilter, setSourceFilter] = useState<ProfileSuggestionSourceFilter>("all");
@@ -4163,7 +4226,10 @@ function ProfileSuggestionQueue({
       <div className="panel-header">
         <div>
           <h3>Profile Suggestions</h3>
-          <p>{filteredItems.length} roster-based {filteredItems.length === 1 ? "match" : "matches"}.</p>
+          <p>
+            {filteredItems.length} roster-based {filteredItems.length === 1 ? "match" : "matches"}
+            {ignoredCount ? `, ${ignoredCount} ignored` : ""}.
+          </p>
         </div>
         <UserPlus size={20} color="var(--teal-dark)" />
       </div>
@@ -4197,6 +4263,7 @@ function ProfileSuggestionQueue({
                   <span>{item.profileSource.toUpperCase()} roster</span>
                   <button onClick={() => onSelectDevice(item.device.id)} type="button">Inspect</button>
                   <button onClick={() => onAssign(item)} type="button">Assign</button>
+                  <button onClick={() => onBulkIgnore([item])} type="button">Ignore</button>
                 </div>
               </div>
             ))}
@@ -4210,6 +4277,15 @@ function ProfileSuggestionQueue({
             <UserPlus size={17} />
             Assign Visible
           </button>
+          <button
+            className="text-button"
+            disabled={shownItems.length === 0}
+            onClick={() => onBulkIgnore(shownItems)}
+            type="button"
+          >
+            <Ban size={17} />
+            Ignore Visible
+          </button>
         </>
       ) : (
         <div className="empty-state compact-empty">
@@ -4217,6 +4293,12 @@ function ProfileSuggestionQueue({
           <p>Import a roster or inspect unknown hostnames to build suggested owner matches.</p>
         </div>
       )}
+      {ignoredCount ? (
+        <button className="text-button" onClick={onRestoreIgnored} type="button">
+          <RefreshCcw size={17} />
+          Restore Ignored
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -4410,6 +4492,7 @@ function buildProfileSuggestionQueue(
         confidence: resolution.confidence,
         confidenceScore: resolution.confidenceScore,
         device,
+        id: `${device.id}:${profile.id}`,
         profile,
         profileSource: getProfileSource(profile),
         reason: suggestionEvidence.label.replace(/^Suggested owner:\s*/i, "Matched"),
