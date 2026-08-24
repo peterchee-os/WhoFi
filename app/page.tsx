@@ -3874,6 +3874,7 @@ function DeviceLedger({
           {shownDevices.map((device) => {
             const profile = device.profileId ? profileById.get(device.profileId) : undefined;
             const resolution = resolutionByDeviceId.get(device.id);
+            const suggestedProfile = !profile && resolution?.profileId ? profileById.get(resolution.profileId) : undefined;
             const usage = device.rxBytes + device.txBytes;
 
             return (
@@ -3886,9 +3887,9 @@ function DeviceLedger({
                 </td>
                 <td>
                   <div className="device-name">
-                    <strong>{profile?.displayName ?? "Unclaimed"}</strong>
+                    <strong>{profile?.displayName ?? suggestedProfile?.displayName ?? "Unclaimed"}</strong>
                     <span>
-                      {profile?.organizationName ?? "No profile yet"}
+                      {profile?.organizationName ?? suggestedProfile?.organizationName ?? (suggestedProfile ? "Suggested profile" : "No profile yet")}
                       {resolution ? ` · ${resolution.confidence} ${resolution.confidenceScore}%` : ""}
                     </span>
                   </div>
@@ -3946,14 +3947,16 @@ function DeviceInspector({
   resolution?: DeviceResolution;
 }) {
   const fallbackProfileId = profiles[0]?.id ?? "";
-  const [selectedProfileId, setSelectedProfileId] = useState(device.profileId ?? fallbackProfileId);
+  const suggestedProfile = !device.profileId && resolution?.profileId ? profileById.get(resolution.profileId) : undefined;
+  const initialProfileId = device.profileId ?? suggestedProfile?.id ?? fallbackProfileId;
+  const [selectedProfileId, setSelectedProfileId] = useState(initialProfileId);
   const profile = device.profileId ? profileById.get(device.profileId) : undefined;
   const usage = device.rxBytes + device.txBytes;
   const assignProfileId = selectedProfileId || fallbackProfileId;
 
   useEffect(() => {
-    setSelectedProfileId(device.profileId ?? fallbackProfileId);
-  }, [device.id, device.profileId, fallbackProfileId]);
+    setSelectedProfileId(device.profileId ?? suggestedProfile?.id ?? fallbackProfileId);
+  }, [device.id, device.profileId, fallbackProfileId, suggestedProfile?.id]);
 
   return (
     <section className="panel">
@@ -3966,9 +3969,21 @@ function DeviceInspector({
       </div>
       <div className="detail-body">
         <div className="detail-title">
-          <strong>{profile?.displayName ?? "Unclaimed"}</strong>
-          <span>{profile?.organizationName ?? "No owner assigned"}</span>
+          <strong>{profile?.displayName ?? suggestedProfile?.displayName ?? "Unclaimed"}</strong>
+          <span>{profile?.organizationName ?? suggestedProfile?.organizationName ?? "No owner assigned"}</span>
         </div>
+
+        {!profile && suggestedProfile ? (
+          <div className="suggestion-box">
+            <div>
+              <strong>Suggested owner</strong>
+              <span>{suggestedProfile.displayName} · {resolution?.confidence ?? "low"} {resolution?.confidenceScore ?? 0}%</span>
+            </div>
+            <button className="text-button slim primary" onClick={() => onAssignDevice(device.id, suggestedProfile.id)}>
+              Assign Suggested
+            </button>
+          </div>
+        ) : null}
 
         {resolution ? (
           <div className="evidence-box">

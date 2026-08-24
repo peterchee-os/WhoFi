@@ -128,6 +128,7 @@ Exit criteria:
 
 - external people/companies can be synced
 - CSV people can be imported into the local roster and assigned to devices
+- hostname/person/org evidence can suggest profile links for operator review
 - email/external id can suggest profile links
 - Yardi is supported without Thinkspace hardcoding
 

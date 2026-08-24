@@ -1141,6 +1141,33 @@ textarea {
   line-height: 1.5;
 }
 
+.suggestion-box {
+  border: 1px solid var(--teal);
+  border-radius: 8px;
+  background: #f0f7f5;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.suggestion-box div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.suggestion-box strong {
+  font-size: 13px;
+}
+
+.suggestion-box span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .confidence-pill {
   min-height: 24px;
   border-radius: 999px;

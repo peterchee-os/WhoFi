@@ -4,6 +4,7 @@ export type ResolutionConfidence = "none" | "low" | "medium" | "high";
 
 export type ResolutionEvidenceType =
   | "explicit_assignment"
+  | "suggested_profile"
   | "known_agent_profile"
   | "staff_managed_device"
   | "hostname_hint"
@@ -34,6 +35,8 @@ export function resolveDevices(devices: Device[], profiles: Profile[]): DeviceRe
 
 export function resolveDevice(device: Device, profileById: Map<string, Profile>): DeviceResolution {
   const profile = device.profileId ? profileById.get(device.profileId) : undefined;
+  const suggestedProfile = profile ? undefined : findSuggestedProfile(device, Array.from(profileById.values()));
+  const resolvedProfile = profile ?? suggestedProfile;
   const evidence: ResolutionEvidence[] = [];
 
   if (profile) {
@@ -52,6 +55,14 @@ export function resolveDevice(device: Device, profileById: Map<string, Profile>)
     });
   }
 
+  if (suggestedProfile) {
+    evidence.push({
+      label: `Suggested owner: ${suggestedProfile.displayName}`,
+      type: "suggested_profile",
+      weight: 38
+    });
+  }
+
   if (device.status === "managed" || device.status === "staff_assigned") {
     evidence.push({
       label: "Staff-managed device state",
@@ -60,11 +71,11 @@ export function resolveDevice(device: Device, profileById: Map<string, Profile>)
     });
   }
 
-  if (profile && hostnameMatchesProfile(device.hostname, profile)) {
+  if (resolvedProfile && hostnameMatchesProfile(device.hostname, resolvedProfile)) {
     evidence.push({
       label: "Hostname matches owner context",
       type: "hostname_hint",
-      weight: 8
+      weight: profile ? 8 : 12
     });
   }
 
@@ -98,11 +109,23 @@ export function resolveDevice(device: Device, profileById: Map<string, Profile>)
     confidence: scoreToConfidence(confidenceScore),
     confidenceScore,
     deviceId: device.id,
-    displayName: profile?.displayName ?? "Unassigned",
+    displayName: resolvedProfile?.displayName ?? "Unassigned",
     evidence,
     needsReview: !profile || confidenceScore < 60 || device.riskState === "automation_like" || device.riskState === "possible_bot",
-    profileId: profile?.id
+    profileId: resolvedProfile?.id
   };
+}
+
+function findSuggestedProfile(device: Device, profiles: Profile[]) {
+  return profiles
+    .filter((profile) => hostnameMatchesProfile(device.hostname, profile))
+    .sort((a, b) => profileSuggestionScore(b) - profileSuggestionScore(a))[0];
+}
+
+function profileSuggestionScore(profile: Profile) {
+  const levelScore = profile.profileLevel === "operational" ? 4 : profile.profileLevel === "linked" ? 3 : profile.profileLevel === "verified" ? 2 : 1;
+  const typeScore = profile.profileType === "staff" || profile.profileType === "customer" ? 2 : profile.profileType === "unknown" ? 0 : 1;
+  return levelScore + typeScore;
 }
 
 function hostnameMatchesProfile(hostname: string, profile: Profile) {
