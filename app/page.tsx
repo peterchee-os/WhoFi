@@ -1421,6 +1421,41 @@ export default function Home() {
     }
   };
 
+  const exportProfileSuggestions = (items: ProfileSuggestionQueueItem[]) => {
+    if (items.length === 0) {
+      setNotice("No suggestions to export");
+      return;
+    }
+
+    const csv = toCsv([
+      ["device_id", "hostname", "mac", "ssid", "ap", "profile_id", "profile_name", "profile_source", "organization", "confidence", "confidence_score", "usage_bytes", "reason"],
+      ...items.map((item) => [
+        item.device.id,
+        item.device.hostname,
+        item.device.mac,
+        item.device.ssid,
+        item.device.apName,
+        item.profile.id,
+        item.profile.displayName,
+        item.profileSource,
+        item.profile.organizationName ?? "",
+        item.confidence,
+        `${item.confidenceScore}`,
+        `${item.usage}`,
+        item.reason
+      ])
+    ]);
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `whofi-profile-suggestions-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setNotice("Suggestions exported");
+    addActivity(setActivity, `Exported ${items.length} profile ${items.length === 1 ? "suggestion" : "suggestions"}`);
+  };
+
   const importCsvProfiles = (nextProfiles: Profile[]) => {
     if (nextProfiles.length === 0) {
       setNotice("No profiles imported");
@@ -1686,6 +1721,7 @@ export default function Home() {
             onAssignDevice={assignDevice}
             onBlockDevice={blockDevice}
             onBulkAssignSuggestions={assignSuggestedProfiles}
+            onExportSuggestions={exportProfileSuggestions}
             onIgnoreSuggestions={ignoreProfileSuggestions}
             onRestoreIgnoredSuggestions={restoreIgnoredProfileSuggestions}
             onSelectDevice={setSelectedDeviceId}
@@ -1710,6 +1746,7 @@ export default function Home() {
             onAssignDevice={assignDevice}
             onBlockDevice={blockDevice}
             onBulkAssignSuggestions={assignSuggestedProfiles}
+            onExportSuggestions={exportProfileSuggestions}
             onIgnoreSuggestions={ignoreProfileSuggestions}
             onRestoreIgnoredSuggestions={restoreIgnoredProfileSuggestions}
             onSelectDevice={setSelectedDeviceId}
@@ -1941,6 +1978,7 @@ function DashboardView({
   onAssignDevice,
   onBlockDevice,
   onBulkAssignSuggestions,
+  onExportSuggestions,
   onIgnoreSuggestions,
   onRestoreIgnoredSuggestions,
   onSelectDevice,
@@ -1962,6 +2000,7 @@ function DashboardView({
   onAssignDevice: (deviceId: string, profileId: string) => void;
   onBlockDevice: (deviceId: string) => void;
   onBulkAssignSuggestions: (items: ProfileSuggestionQueueItem[]) => void;
+  onExportSuggestions: (items: ProfileSuggestionQueueItem[]) => void;
   onIgnoreSuggestions: (items: ProfileSuggestionQueueItem[]) => void;
   onRestoreIgnoredSuggestions: () => void;
   onSelectDevice: (deviceId: string) => void;
@@ -2003,6 +2042,7 @@ function DashboardView({
           limit={4}
           onAssign={(item) => onAssignDevice(item.device.id, item.profile.id)}
           onBulkAssign={onBulkAssignSuggestions}
+          onExport={onExportSuggestions}
           onBulkIgnore={onIgnoreSuggestions}
           onRestoreIgnored={onRestoreIgnoredSuggestions}
           onSelectDevice={onSelectDevice}
@@ -2022,6 +2062,7 @@ function DevicesView({
   onAssignDevice,
   onBlockDevice,
   onBulkAssignSuggestions,
+  onExportSuggestions,
   onIgnoreSuggestions,
   onRestoreIgnoredSuggestions,
   onSelectDevice,
@@ -2038,6 +2079,7 @@ function DevicesView({
   onAssignDevice: (deviceId: string, profileId: string) => void;
   onBlockDevice: (deviceId: string) => void;
   onBulkAssignSuggestions: (items: ProfileSuggestionQueueItem[]) => void;
+  onExportSuggestions: (items: ProfileSuggestionQueueItem[]) => void;
   onIgnoreSuggestions: (items: ProfileSuggestionQueueItem[]) => void;
   onRestoreIgnoredSuggestions: () => void;
   onSelectDevice: (deviceId: string) => void;
@@ -2079,6 +2121,7 @@ function DevicesView({
           items={profileSuggestionQueue}
           onAssign={(item) => onAssignDevice(item.device.id, item.profile.id)}
           onBulkAssign={onBulkAssignSuggestions}
+          onExport={onExportSuggestions}
           onBulkIgnore={onIgnoreSuggestions}
           onRestoreIgnored={onRestoreIgnoredSuggestions}
           onSelectDevice={onSelectDevice}
@@ -4197,6 +4240,7 @@ function ProfileSuggestionQueue({
   onAssign,
   onBulkAssign,
   onBulkIgnore,
+  onExport,
   onRestoreIgnored,
   onSelectDevice
 }: {
@@ -4206,6 +4250,7 @@ function ProfileSuggestionQueue({
   onAssign: (item: ProfileSuggestionQueueItem) => void;
   onBulkAssign: (items: ProfileSuggestionQueueItem[]) => void;
   onBulkIgnore: (items: ProfileSuggestionQueueItem[]) => void;
+  onExport: (items: ProfileSuggestionQueueItem[]) => void;
   onRestoreIgnored: () => void;
   onSelectDevice: (deviceId: string) => void;
 }) {
@@ -4285,6 +4330,15 @@ function ProfileSuggestionQueue({
           >
             <Ban size={17} />
             Ignore Visible
+          </button>
+          <button
+            className="text-button"
+            disabled={shownItems.length === 0}
+            onClick={() => onExport(shownItems)}
+            type="button"
+          >
+            <Download size={17} />
+            Export Visible
           </button>
         </>
       ) : (
