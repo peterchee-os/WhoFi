@@ -28,6 +28,7 @@ Latest completed slices:
 - `/api/sessions` endpoint with the same source, gate, and token behavior as `/api/devices`
 - `POST /api/snapshot-history/capture` endpoint for write/capture semantics; `/api/devices` remains read-only
 - `GET /api/snapshot-history/review-queue` endpoint for open stored capture reviews and queue summary counts
+- `PATCH /api/snapshot-history/review-queue` endpoint for bulk marking selected review queue captures reviewed/open without clearing review notes
 - `PATCH /api/snapshot-history/{id}` endpoint for review notes and reviewed/open state on stored captures
 - `GET /api/snapshot-history/{id}/report` endpoint for Markdown capture reports
 - `DELETE /api/snapshot-history/{id}` endpoint for removing one bad/noisy stored capture without clearing all history

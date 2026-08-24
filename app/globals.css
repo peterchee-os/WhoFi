@@ -906,7 +906,8 @@ textarea {
   outline-offset: -2px;
 }
 
-.source-filter {
+.source-filter,
+.queue-filter-group {
   margin: 0 18px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -915,7 +916,12 @@ textarea {
   overflow: hidden;
 }
 
-.source-filter button {
+.queue-filter-group.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.source-filter button,
+.queue-filter-group button {
   min-height: 34px;
   border: 0;
   border-right: 1px solid var(--line);
@@ -930,16 +936,19 @@ textarea {
   gap: 6px;
 }
 
-.source-filter button:last-child {
+.source-filter button:last-child,
+.queue-filter-group button:last-child {
   border-right: 0;
 }
 
-.source-filter button.active {
+.source-filter button.active,
+.queue-filter-group button.active {
   background: #f0f7f5;
   color: var(--teal-dark);
 }
 
-.source-filter strong {
+.source-filter strong,
+.queue-filter-group strong {
   min-width: 20px;
   min-height: 20px;
   border-radius: 999px;
@@ -950,7 +959,8 @@ textarea {
   font-size: 11px;
 }
 
-.source-filter button:focus-visible {
+.source-filter button:focus-visible,
+.queue-filter-group button:focus-visible {
   outline: 2px solid var(--teal);
   outline-offset: -2px;
 }

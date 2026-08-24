@@ -44,6 +44,7 @@ import type { Alert, AlertStatus, Device, DeviceStatus, Profile, RiskState } fro
 type View = "dashboard" | "devices" | "usage" | "profiles" | "alerts" | "settings";
 type DeviceSnapshotSource = "demo" | "omada" | "omada-pp";
 type SnapshotHistorySourceFilter = "all" | DeviceSnapshotSource;
+type SnapshotReviewQueueSeverityFilter = "all" | SnapshotReviewQueueItem["severity"];
 type NotificationProviderMode = "disabled" | "console" | "resend";
 type EmailDeliveryStatus = "sent" | "failed" | "disabled" | "rendered";
 type NotificationRuleKey =
@@ -287,6 +288,7 @@ export default function Home() {
   const [selectedSnapshotCaptureId, setSelectedSnapshotCaptureId] = useState("");
   const [snapshotReviewNoteDraft, setSnapshotReviewNoteDraft] = useState("");
   const [persistedSnapshotCaptureIds, setPersistedSnapshotCaptureIds] = useState<string[]>([]);
+  const [reviewQueueUpdating, setReviewQueueUpdating] = useState(false);
   const [snapshotCaptureState, setSnapshotCaptureState] = useState<IntegrationTestState>({
     message: "No capture selected",
     status: "idle"
@@ -753,6 +755,56 @@ export default function Home() {
     }
   };
 
+  const markVisibleSnapshotQueueReviewed = async (ids: string[]) => {
+    if (ids.length === 0 || reviewQueueUpdating) return;
+
+    setReviewQueueUpdating(true);
+    try {
+      const response = await fetch("/api/snapshot-history/review-queue", {
+        body: JSON.stringify({
+          ids,
+          reviewed: true
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "PATCH"
+      });
+      const payload = (await response.json()) as {
+        entries?: SnapshotHistoryEntry[];
+        error?: string;
+        updatedIds?: string[];
+      };
+      if (!response.ok || !Array.isArray(payload.entries)) {
+        throw new Error(payload.error ?? "Review queue update failed");
+      }
+
+      const updatedIds = Array.isArray(payload.updatedIds) ? payload.updatedIds : [];
+      setPersistedSnapshotCaptureIds(payload.entries.map((entry) => entry.id));
+      setSnapshotHistory((current) => mergeSnapshotHistory(payload.entries ?? [], current).slice(0, 10));
+      if (selectedSnapshotCaptureId && updatedIds.includes(selectedSnapshotCaptureId)) {
+        void loadSnapshotCapture(selectedSnapshotCaptureId);
+      }
+      setSnapshotCaptureState({
+        message: `${updatedIds.length} capture ${updatedIds.length === 1 ? "review" : "reviews"} closed`,
+        status: "success",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Queue reviewed");
+      addActivity(setActivity, `Marked ${updatedIds.length} visible snapshot ${updatedIds.length === 1 ? "review" : "reviews"} reviewed`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Review queue update failed";
+      setSnapshotCaptureState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Queue update failed");
+    } finally {
+      setReviewQueueUpdating(false);
+    }
+  };
+
   const loadDeviceSource = async (source: DeviceSnapshotSource) => {
     setSourceState({
       message: "Loading",
@@ -1069,10 +1121,12 @@ export default function Home() {
             onExportSelectedSnapshotCapture={exportSelectedSnapshotCapture}
             onExportSelectedSnapshotReport={exportSelectedSnapshotReport}
             onLoadSnapshotCapture={loadSnapshotCapture}
+            onMarkVisibleSnapshotQueueReviewed={markVisibleSnapshotQueueReviewed}
             onSnapshotReviewNoteChange={setSnapshotReviewNoteDraft}
             onUpdateSnapshotReview={updateSelectedSnapshotReview}
             onUseSelectedSnapshotCapture={useSelectedSnapshotCapture}
             persistedSnapshotCaptureIds={persistedSnapshotCaptureIds}
+            reviewQueueUpdating={reviewQueueUpdating}
             selectedSnapshotComparison={selectedSnapshotComparison}
             selectedSnapshotCapture={selectedSnapshotCapture}
             selectedSnapshotCaptureId={selectedSnapshotCaptureId}
@@ -1351,10 +1405,12 @@ function UsageView({
   onExportSelectedSnapshotCapture,
   onExportSelectedSnapshotReport,
   onLoadSnapshotCapture,
+  onMarkVisibleSnapshotQueueReviewed,
   onSnapshotReviewNoteChange,
   onUpdateSnapshotReview,
   onUseSelectedSnapshotCapture,
   persistedSnapshotCaptureIds,
+  reviewQueueUpdating,
   selectedSnapshotComparison,
   selectedSnapshotCapture,
   selectedSnapshotCaptureId,
@@ -1368,10 +1424,12 @@ function UsageView({
   onExportSelectedSnapshotCapture: () => void;
   onExportSelectedSnapshotReport: () => void;
   onLoadSnapshotCapture: (entryId: string) => void;
+  onMarkVisibleSnapshotQueueReviewed: (ids: string[]) => void;
   onSnapshotReviewNoteChange: (value: string) => void;
   onUpdateSnapshotReview: (reviewed?: boolean) => void;
   onUseSelectedSnapshotCapture: () => void;
   persistedSnapshotCaptureIds: string[];
+  reviewQueueUpdating: boolean;
   selectedSnapshotComparison?: SnapshotCaptureComparison;
   selectedSnapshotCapture?: SnapshotCaptureRecord;
   selectedSnapshotCaptureId: string;
@@ -1381,6 +1439,8 @@ function UsageView({
   snapshotReviewNoteDraft: string;
 }) {
   const [historySourceFilter, setHistorySourceFilter] = useState<SnapshotHistorySourceFilter>("all");
+  const [reviewQueueSourceFilter, setReviewQueueSourceFilter] = useState<SnapshotHistorySourceFilter>("all");
+  const [reviewQueueSeverityFilter, setReviewQueueSeverityFilter] = useState<SnapshotReviewQueueSeverityFilter>("all");
   const maxRollupBytes = Math.max(0, ...sessionSnapshot.rollups.map((rollup) => rollup.totalBytes));
   const filteredSnapshotHistory = useMemo(
     () =>
@@ -1391,6 +1451,19 @@ function UsageView({
   );
   const snapshotHistoryCounts = useMemo(() => getSnapshotHistoryCounts(snapshotHistory), [snapshotHistory]);
   const snapshotReviewQueue = useMemo(() => buildSnapshotReviewQueue(snapshotHistory), [snapshotHistory]);
+  const filteredSnapshotReviewQueue = useMemo(
+    () =>
+      snapshotReviewQueue.filter((item) => {
+        const sourceMatch = reviewQueueSourceFilter === "all" || item.source === reviewQueueSourceFilter;
+        const severityMatch = reviewQueueSeverityFilter === "all" || item.severity === reviewQueueSeverityFilter;
+        return sourceMatch && severityMatch;
+      }),
+    [reviewQueueSeverityFilter, reviewQueueSourceFilter, snapshotReviewQueue]
+  );
+  const snapshotReviewQueueFilterCounts = useMemo(
+    () => getSnapshotReviewQueueFilterCounts(snapshotReviewQueue),
+    [snapshotReviewQueue]
+  );
   const snapshotReviewQueueSummary = useMemo(
     () => buildSnapshotReviewQueueSummary(snapshotHistory, snapshotReviewQueue),
     [snapshotHistory, snapshotReviewQueue]
@@ -1428,10 +1501,17 @@ function UsageView({
         </div>
 
         <SnapshotReviewQueuePanel
-          items={snapshotReviewQueue}
+          filterCounts={snapshotReviewQueueFilterCounts}
+          items={filteredSnapshotReviewQueue}
+          onMarkVisibleReviewed={() => onMarkVisibleSnapshotQueueReviewed(filteredSnapshotReviewQueue.slice(0, 5).map((item) => item.id))}
           onLoadCapture={onLoadSnapshotCapture}
+          onSeverityFilterChange={setReviewQueueSeverityFilter}
+          onSourceFilterChange={setReviewQueueSourceFilter}
+          severityFilter={reviewQueueSeverityFilter}
           selectedEntryId={selectedSnapshotCaptureId}
+          sourceFilter={reviewQueueSourceFilter}
           summary={snapshotReviewQueueSummary}
+          updating={reviewQueueUpdating}
         />
 
         <SnapshotHistoryPanel
@@ -1673,25 +1753,52 @@ function SnapshotCapturePanel({
 }
 
 function SnapshotReviewQueuePanel({
+  filterCounts,
   items,
+  onMarkVisibleReviewed,
   onLoadCapture,
+  onSeverityFilterChange,
+  onSourceFilterChange,
+  severityFilter,
   selectedEntryId,
-  summary
+  sourceFilter,
+  summary,
+  updating
 }: {
+  filterCounts: {
+    source: Record<SnapshotHistorySourceFilter, number>;
+    severity: Record<SnapshotReviewQueueSeverityFilter, number>;
+  };
   items: SnapshotReviewQueueItem[];
+  onMarkVisibleReviewed: () => void;
   onLoadCapture: (entryId: string) => void;
+  onSeverityFilterChange: (filter: SnapshotReviewQueueSeverityFilter) => void;
+  onSourceFilterChange: (filter: SnapshotHistorySourceFilter) => void;
+  severityFilter: SnapshotReviewQueueSeverityFilter;
   selectedEntryId: string;
+  sourceFilter: SnapshotHistorySourceFilter;
   summary: SnapshotReviewQueueSummary;
+  updating: boolean;
 }) {
   const visibleItems = items.slice(0, 5);
+  const sourceFilters: SnapshotHistorySourceFilter[] = ["all", "demo", "omada", "omada-pp"];
+  const severityFilters: SnapshotReviewQueueSeverityFilter[] = ["all", "warning", "watch"];
 
   return (
     <div className="panel">
       <div className="panel-header">
         <div>
           <h3>Capture Review Queue</h3>
-          <p>{items.length} open capture reviews.</p>
+          <p>{items.length} visible of {summary.open} open capture reviews.</p>
         </div>
+        <button
+          className="text-button slim"
+          disabled={visibleItems.length === 0 || updating}
+          onClick={onMarkVisibleReviewed}
+          type="button"
+        >
+          {updating ? "Reviewing" : "Mark Visible Reviewed"}
+        </button>
       </div>
       <div className="review-queue-summary">
         <div>
@@ -1710,6 +1817,32 @@ function SnapshotReviewQueuePanel({
           <span>Reviewed</span>
           <strong>{summary.reviewed}</strong>
         </div>
+      </div>
+      <div className="queue-filter-group" aria-label="Review queue source filter">
+        {sourceFilters.map((source) => (
+          <button
+            className={sourceFilter === source ? "active" : ""}
+            key={source}
+            onClick={() => onSourceFilterChange(source)}
+            type="button"
+          >
+            <span>{source === "all" ? "All" : formatDeviceSourceLabel(source)}</span>
+            <strong>{filterCounts.source[source]}</strong>
+          </button>
+        ))}
+      </div>
+      <div className="queue-filter-group compact" aria-label="Review queue severity filter">
+        {severityFilters.map((severity) => (
+          <button
+            className={severityFilter === severity ? "active" : ""}
+            key={severity}
+            onClick={() => onSeverityFilterChange(severity)}
+            type="button"
+          >
+            <span>{severity === "all" ? "All" : severity}</span>
+            <strong>{filterCounts.severity[severity]}</strong>
+          </button>
+        ))}
       </div>
       <div className="list">
         {visibleItems.length ? (
@@ -1731,7 +1864,7 @@ function SnapshotReviewQueuePanel({
           ))
         ) : (
           <div className="list-item compact-item">
-            <p>No open capture reviews.</p>
+            <p>No open capture reviews match these filters.</p>
           </div>
         )}
       </div>
@@ -3045,6 +3178,39 @@ function getSnapshotHistoryCounts(entries: SnapshotHistoryEntry[]): Record<Snaps
       demo: 0,
       omada: 0,
       "omada-pp": 0
+    }
+  );
+}
+
+function getSnapshotReviewQueueFilterCounts(items: SnapshotReviewQueueItem[]) {
+  return items.reduce(
+    (counts, item) => ({
+      source: {
+        ...counts.source,
+        all: counts.source.all + 1,
+        [item.source]: counts.source[item.source] + 1
+      },
+      severity: {
+        ...counts.severity,
+        all: counts.severity.all + 1,
+        [item.severity]: counts.severity[item.severity] + 1
+      }
+    }),
+    {
+      source: {
+        all: 0,
+        demo: 0,
+        omada: 0,
+        "omada-pp": 0
+      },
+      severity: {
+        all: 0,
+        warning: 0,
+        watch: 0
+      }
+    } satisfies {
+      source: Record<SnapshotHistorySourceFilter, number>;
+      severity: Record<SnapshotReviewQueueSeverityFilter, number>;
     }
   );
 }

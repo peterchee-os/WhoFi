@@ -104,6 +104,43 @@ export async function updateSnapshotCaptureReview(
   };
 }
 
+export async function updateSnapshotCaptureReviews(
+  ids: string[],
+  update: { reviewNote?: string; reviewedAt?: string },
+  env: NodeJS.ProcessEnv = process.env
+): Promise<{ entries: SnapshotHistoryEntry[]; updatedIds: string[] }> {
+  const current = await readSnapshotHistoryFile(env);
+  const requestedIds = new Set(ids);
+  const updatedIds = new Set<string>();
+
+  const entries = current.entries.map((entry) => {
+    if (!requestedIds.has(entry.id)) return entry;
+    updatedIds.add(entry.id);
+    return applyCaptureReviewUpdate(entry, update);
+  });
+  const captures = current.captures.map((capture) => {
+    if (!requestedIds.has(capture.id)) return capture;
+    updatedIds.add(capture.id);
+    return {
+      ...capture,
+      summary: applyCaptureReviewUpdate(capture.summary, update)
+    };
+  });
+
+  if (updatedIds.size === 0) {
+    return {
+      entries: current.entries,
+      updatedIds: []
+    };
+  }
+
+  await writeSnapshotHistoryFile({ captures, entries }, env);
+  return {
+    entries,
+    updatedIds: Array.from(updatedIds)
+  };
+}
+
 export async function clearSnapshotHistory(env: NodeJS.ProcessEnv = process.env) {
   await writeSnapshotHistoryFile({ captures: [], entries: [] }, env);
 }
@@ -182,11 +219,16 @@ function applyCaptureReviewUpdate(
   entry: SnapshotHistoryEntry,
   update: { reviewNote?: string; reviewedAt?: string }
 ): SnapshotHistoryEntry {
-  return {
+  const next: SnapshotHistoryEntry = {
     ...entry,
-    reviewNote: update.reviewNote,
     reviewedAt: update.reviewedAt
   };
+
+  if ("reviewNote" in update) {
+    next.reviewNote = update.reviewNote;
+  }
+
+  return next;
 }
 
 function isSnapshotCaptureRecord(value: unknown): value is SnapshotCaptureRecord {
