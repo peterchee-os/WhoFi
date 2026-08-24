@@ -30,10 +30,12 @@ import { integrationCatalog, type IntegrationCatalogItem } from "@/lib/integrati
 import { resolveDevices, type DeviceResolution } from "@/lib/resolution";
 import { buildSessionSnapshot, type SessionSnapshot, type UsageRollup, type UsageRollupDimension } from "@/lib/session-rollups";
 import {
+  buildSnapshotReviewQueue,
   createSnapshotHistoryEntry,
   type SnapshotCaptureComparison,
   type SnapshotCaptureRecord,
-  type SnapshotHistoryEntry
+  type SnapshotHistoryEntry,
+  type SnapshotReviewQueueItem
 } from "@/lib/snapshot-history";
 import type { Alert, AlertStatus, Device, DeviceStatus, Profile, RiskState } from "@/lib/types";
 
@@ -1386,6 +1388,7 @@ function UsageView({
     [historySourceFilter, snapshotHistory]
   );
   const snapshotHistoryCounts = useMemo(() => getSnapshotHistoryCounts(snapshotHistory), [snapshotHistory]);
+  const snapshotReviewQueue = useMemo(() => buildSnapshotReviewQueue(snapshotHistory), [snapshotHistory]);
 
   return (
     <section className="content-grid usage-layout">
@@ -1417,6 +1420,12 @@ function UsageView({
             </div>
           </div>
         </div>
+
+        <SnapshotReviewQueuePanel
+          items={snapshotReviewQueue}
+          onLoadCapture={onLoadSnapshotCapture}
+          selectedEntryId={selectedSnapshotCaptureId}
+        />
 
         <SnapshotHistoryPanel
           entries={filteredSnapshotHistory}
@@ -1652,6 +1661,53 @@ function SnapshotCapturePanel({
           <p>Stored captures include the device snapshot and session rollups for later audit.</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function SnapshotReviewQueuePanel({
+  items,
+  onLoadCapture,
+  selectedEntryId
+}: {
+  items: SnapshotReviewQueueItem[];
+  onLoadCapture: (entryId: string) => void;
+  selectedEntryId: string;
+}) {
+  const visibleItems = items.slice(0, 5);
+
+  return (
+    <div className="panel">
+      <div className="panel-header">
+        <div>
+          <h3>Capture Review Queue</h3>
+          <p>{items.length} open capture reviews.</p>
+        </div>
+      </div>
+      <div className="list">
+        {visibleItems.length ? (
+          visibleItems.map((item) => (
+            <button
+              className={`list-item compact-item history-button review-queue-item ${selectedEntryId === item.id ? "selected" : ""}`}
+              key={item.id}
+              onClick={() => onLoadCapture(item.id)}
+              type="button"
+            >
+              <div className="list-title">
+                <strong>{formatDeviceSourceLabel(item.source)}</strong>
+                <span className={`metric-pill ${item.severity}`}>{item.severity}</span>
+              </div>
+              <p>{item.reason}</p>
+              {item.reviewNote ? <p className="truncate">{item.reviewNote}</p> : null}
+              <p><RelativeTime value={item.observedAt} /></p>
+            </button>
+          ))
+        ) : (
+          <div className="list-item compact-item">
+            <p>No open capture reviews.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -59,6 +59,32 @@ export type SnapshotReviewSignal = {
   severity: "info" | "watch" | "warning";
 };
 
+export type SnapshotReviewQueueItem = {
+  id: string;
+  observedAt: string;
+  reason: string;
+  reviewNote?: string;
+  severity: "watch" | "warning";
+  source: DeviceSource;
+  unknownDevices: number;
+};
+
+export function buildSnapshotReviewQueue(entries: SnapshotHistoryEntry[]): SnapshotReviewQueueItem[] {
+  return entries
+    .filter((entry) => !entry.reviewedAt && (entry.reviewSignals > 0 || entry.unknownDevices > 0))
+    .map((entry) => ({
+      id: entry.id,
+      observedAt: entry.observedAt,
+      reason: getReviewQueueReason(entry),
+      reviewNote: entry.reviewNote,
+      severity: entry.reviewSignals > 0 ? ("warning" as const) : ("watch" as const),
+      source: entry.source,
+      unknownDevices: entry.unknownDevices
+    }))
+    .sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime())
+    .slice(0, 12);
+}
+
 export function buildSnapshotCaptureComparison(
   current: SnapshotCaptureRecord,
   previous: SnapshotCaptureRecord
@@ -82,6 +108,14 @@ export function buildSnapshotCaptureComparison(
     previousObservedAt: previous.summary.observedAt,
     reviewSignals: buildReviewSignals(current, previous, newDevices, missingDevices)
   };
+}
+
+function getReviewQueueReason(entry: SnapshotHistoryEntry) {
+  if (entry.reviewSignals > 0 && entry.unknownDevices > 0) {
+    return `${entry.reviewSignals} review signals, ${entry.unknownDevices} unknown devices`;
+  }
+  if (entry.reviewSignals > 0) return `${entry.reviewSignals} review signals`;
+  return `${entry.unknownDevices} unknown devices`;
 }
 
 function getNewDevices(current: SnapshotCaptureRecord, previous: SnapshotCaptureRecord) {

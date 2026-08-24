@@ -840,6 +840,20 @@ textarea {
   color: var(--red);
 }
 
+.metric-pill.watch {
+  background: #fef3c7;
+  color: var(--amber);
+}
+
+.metric-pill.warning {
+  background: #fee2e2;
+  color: var(--red);
+}
+
+.review-queue-item p:last-child {
+  font-size: 12px;
+}
+
 .snapshot-history-row p:last-child {
   font-size: 12px;
 }
