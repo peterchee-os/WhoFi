@@ -752,6 +752,34 @@ export default function Home() {
     }
   };
 
+  const exportSnapshotArchive = async (sourceFilter: SnapshotHistorySourceFilter) => {
+    try {
+      const params = new URLSearchParams({
+        source: sourceFilter
+      });
+      const response = await fetch(`/api/snapshot-history/export?${params.toString()}`);
+      if (!response.ok) throw new Error("Snapshot archive export failed");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `whofi-snapshot-archive-${sourceFilter}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setNotice("Snapshot archive exported");
+      addActivity(setActivity, "Exported snapshot archive");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Snapshot archive export failed";
+      setSnapshotCaptureState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Snapshot archive export failed");
+    }
+  };
+
   const updateSnapshotReviewPolicy = async (policy: SnapshotReviewPolicy) => {
     setSnapshotReviewPolicy(policy);
     setSnapshotReviewPolicyState({
@@ -1351,6 +1379,7 @@ export default function Home() {
             onDeleteSelectedSnapshotCapture={deleteSelectedSnapshotCapture}
             onExportSelectedSnapshotCapture={exportSelectedSnapshotCapture}
             onExportSelectedSnapshotReport={exportSelectedSnapshotReport}
+            onExportSnapshotArchive={exportSnapshotArchive}
             onExportSnapshotReviewPolicy={exportSnapshotReviewPolicy}
             onExportSnapshotReviewQueueReport={exportSnapshotReviewQueueReport}
             onExportSnapshotTrendReport={exportSnapshotTrendReport}
@@ -1645,6 +1674,7 @@ function UsageView({
   onDeleteSelectedSnapshotCapture,
   onExportSelectedSnapshotCapture,
   onExportSelectedSnapshotReport,
+  onExportSnapshotArchive,
   onExportSnapshotReviewPolicy,
   onExportSnapshotReviewQueueReport,
   onExportSnapshotTrendReport,
@@ -1674,6 +1704,7 @@ function UsageView({
   onDeleteSelectedSnapshotCapture: () => void;
   onExportSelectedSnapshotCapture: () => void;
   onExportSelectedSnapshotReport: () => void;
+  onExportSnapshotArchive: (sourceFilter: SnapshotHistorySourceFilter) => void;
   onExportSnapshotReviewPolicy: () => void;
   onExportSnapshotReviewQueueReport: (
     sourceFilter: SnapshotHistorySourceFilter,
@@ -1802,6 +1833,7 @@ function UsageView({
           filter={historySourceFilter}
           filterCounts={snapshotHistoryCounts}
           onClear={onClearSnapshotHistory}
+          onExportArchive={() => onExportSnapshotArchive(historySourceFilter)}
           onFilterChange={setHistorySourceFilter}
           onLoadCapture={onLoadSnapshotCapture}
           persistedEntryIds={persistedSnapshotCaptureIds}
@@ -2362,6 +2394,7 @@ function SnapshotHistoryPanel({
   filter,
   filterCounts,
   onClear,
+  onExportArchive,
   onFilterChange,
   onLoadCapture,
   persistedEntryIds,
@@ -2372,6 +2405,7 @@ function SnapshotHistoryPanel({
   filter: SnapshotHistorySourceFilter;
   filterCounts: Record<SnapshotHistorySourceFilter, number>;
   onClear: () => void;
+  onExportArchive: () => void;
   onFilterChange: (filter: SnapshotHistorySourceFilter) => void;
   onLoadCapture: (entryId: string) => void;
   persistedEntryIds: string[];
@@ -2389,9 +2423,14 @@ function SnapshotHistoryPanel({
           <h3>Snapshot History</h3>
           <p>{visibleEntries.length} of {totalCount} recent captures.</p>
         </div>
-        <button className="text-button slim" disabled={totalCount === 0} onClick={onClear}>
-          Clear
-        </button>
+        <div className="panel-actions">
+          <button className="text-button slim" disabled={entries.length === 0} onClick={onExportArchive}>
+            Export Archive
+          </button>
+          <button className="text-button slim" disabled={totalCount === 0} onClick={onClear}>
+            Clear
+          </button>
+        </div>
       </div>
       <div className="source-filter" aria-label="Snapshot source filter">
         {sourceFilters.map((source) => (
