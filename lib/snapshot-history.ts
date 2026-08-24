@@ -89,8 +89,7 @@ export function buildSnapshotReviewQueue(entries: SnapshotHistoryEntry[]): Snaps
       source: entry.source,
       unknownDevices: entry.unknownDevices
     }))
-    .sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime())
-    .slice(0, 12);
+    .sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime());
 }
 
 export function buildSnapshotReviewQueueSummary(
