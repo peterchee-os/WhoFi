@@ -7,6 +7,7 @@ import type {
   SnapshotReviewQueueSummary,
   SnapshotReviewSignal
 } from "./snapshot-history";
+import type { SnapshotTrendPoint, SnapshotTrendReport } from "./snapshot-trends";
 import type { Device } from "./types";
 
 export function buildSnapshotCaptureReport({
@@ -93,6 +94,41 @@ export function buildSnapshotReviewQueueReport({
   return `${lines.join("\n")}\n`;
 }
 
+export function buildSnapshotTrendReport({
+  generatedAt = new Date().toISOString(),
+  trends
+}: {
+  generatedAt?: string;
+  trends: SnapshotTrendReport;
+}) {
+  const lines = [
+    "# WhoFi Snapshot Trend Report",
+    "",
+    `Generated At: ${generatedAt}`,
+    `Source Filter: ${trends.source}`,
+    "",
+    "## Summary",
+    "",
+    `- Captures: ${trends.summary.captures}`,
+    `- Open reviews: ${trends.summary.openReviews}`,
+    `- Reviewed captures: ${trends.summary.reviewedCaptures}`,
+    `- Max unknown devices: ${trends.summary.maxUnknownDevices}`,
+    `- Max review signals: ${trends.summary.maxReviewSignals}`,
+    `- Latest device delta: ${formatSignedNumber(trends.summary.latestDeviceDelta)}`,
+    `- Latest unknown delta: ${formatSignedNumber(trends.summary.latestUnknownDelta)}`,
+    `- Latest usage delta: ${formatSignedBytes(trends.summary.latestTotalBytesDelta)}`,
+    `- First-to-latest usage delta: ${formatSignedBytes(trends.summary.totalBytesDelta)}`,
+    trends.summary.firstObservedAt ? `- First observed at: ${trends.summary.firstObservedAt}` : undefined,
+    trends.summary.lastObservedAt ? `- Last observed at: ${trends.summary.lastObservedAt}` : undefined,
+    "",
+    "## Recent Points",
+    "",
+    ...formatTrendPoints(trends.points)
+  ].filter((line): line is string => line !== undefined);
+
+  return `${lines.join("\n")}\n`;
+}
+
 function formatComparison(comparison?: SnapshotCaptureComparison) {
   if (!comparison) return ["No previous same-source capture was available."];
 
@@ -126,6 +162,15 @@ function formatQueueItems(items: SnapshotReviewQueueItem[]) {
     ]
       .filter((line): line is string => line !== undefined)
       .join("\n")
+  );
+}
+
+function formatTrendPoints(points: SnapshotTrendPoint[]) {
+  if (!points.length) return ["No stored captures match this source filter."];
+
+  return [...points].reverse().map(
+    (point) =>
+      `- ${point.observedAt}: ${point.onlineDevices} devices, ${point.unknownDevices} unknown, ${point.reviewSignals} review signals, ${formatBytes(point.totalBytes)} (${point.reviewed ? "reviewed" : "open"})`
   );
 }
 

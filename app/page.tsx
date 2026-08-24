@@ -723,6 +723,34 @@ export default function Home() {
     }
   };
 
+  const exportSnapshotTrendReport = async (sourceFilter: SnapshotHistorySourceFilter) => {
+    try {
+      const params = new URLSearchParams({
+        source: sourceFilter
+      });
+      const response = await fetch(`/api/snapshot-history/trends/report?${params.toString()}`);
+      if (!response.ok) throw new Error("Snapshot trend report export failed");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `whofi-snapshot-trends-${sourceFilter}.md`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setNotice("Trend report exported");
+      addActivity(setActivity, "Exported snapshot trend report");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Snapshot trend report export failed";
+      setSnapshotCaptureState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Trend report export failed");
+    }
+  };
+
   const updateSnapshotReviewPolicy = async (policy: SnapshotReviewPolicy) => {
     setSnapshotReviewPolicy(policy);
     setSnapshotReviewPolicyState({
@@ -1236,6 +1264,7 @@ export default function Home() {
             onExportSelectedSnapshotCapture={exportSelectedSnapshotCapture}
             onExportSelectedSnapshotReport={exportSelectedSnapshotReport}
             onExportSnapshotReviewQueueReport={exportSnapshotReviewQueueReport}
+            onExportSnapshotTrendReport={exportSnapshotTrendReport}
             onLoadSnapshotCapture={loadSnapshotCapture}
             onMarkVisibleSnapshotQueueReviewed={markVisibleSnapshotQueueReviewed}
             onSnapshotReviewNoteChange={setSnapshotReviewNoteDraft}
@@ -1524,6 +1553,7 @@ function UsageView({
   onExportSelectedSnapshotCapture,
   onExportSelectedSnapshotReport,
   onExportSnapshotReviewQueueReport,
+  onExportSnapshotTrendReport,
   onLoadSnapshotCapture,
   onMarkVisibleSnapshotQueueReviewed,
   onSnapshotReviewNoteChange,
@@ -1550,6 +1580,7 @@ function UsageView({
     sourceFilter: SnapshotHistorySourceFilter,
     severityFilter: SnapshotReviewQueueSeverityFilter
   ) => void;
+  onExportSnapshotTrendReport: (sourceFilter: SnapshotHistorySourceFilter) => void;
   onLoadSnapshotCapture: (entryId: string) => void;
   onMarkVisibleSnapshotQueueReviewed: (ids: string[]) => void;
   onSnapshotReviewNoteChange: (value: string) => void;
@@ -1672,7 +1703,10 @@ function UsageView({
       </div>
 
       <div className="usage-rollup-grid">
-        <SnapshotTrendsPanel trends={snapshotTrends} />
+        <SnapshotTrendsPanel
+          onExportReport={() => onExportSnapshotTrendReport(historySourceFilter)}
+          trends={snapshotTrends}
+        />
         <SnapshotCapturePanel
           capture={selectedSnapshotCapture}
           comparison={selectedSnapshotComparison}
@@ -1749,7 +1783,13 @@ function UsageRollupPanel({
   );
 }
 
-function SnapshotTrendsPanel({ trends }: { trends: SnapshotTrendReport }) {
+function SnapshotTrendsPanel({
+  onExportReport,
+  trends
+}: {
+  onExportReport: () => void;
+  trends: SnapshotTrendReport;
+}) {
   const visiblePoints = [...trends.points].reverse().slice(0, 6);
 
   return (
@@ -1759,7 +1799,14 @@ function SnapshotTrendsPanel({ trends }: { trends: SnapshotTrendReport }) {
           <h3>Snapshot Trends</h3>
           <p>{trends.summary.captures} captures · {trends.source === "all" ? "All sources" : formatDeviceSourceLabel(trends.source)}</p>
         </div>
-        <Activity size={20} color="var(--teal-dark)" />
+        <button
+          className="text-button slim"
+          disabled={trends.summary.captures === 0}
+          onClick={onExportReport}
+          type="button"
+        >
+          Trend Report
+        </button>
       </div>
       <div className="usage-summary trend-summary">
         <div>
