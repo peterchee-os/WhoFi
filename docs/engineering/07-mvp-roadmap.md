@@ -122,13 +122,13 @@ Deliverables:
 - CSV/manual import
 - CSV/manual import shape endpoint, parser, preview, and local active-roster import
 - normalized companies/people/contracts
-- profile link suggestions
+- profile link suggestions and operator review queue
 
 Exit criteria:
 
 - external people/companies can be synced
 - CSV people can be imported into the local roster and assigned to devices
-- hostname/person/org evidence can suggest profile links for operator review
+- hostname/person/org evidence can suggest profile links for individual or visible-batch operator review
 - email/external id can suggest profile links
 - Yardi is supported without Thinkspace hardcoding
 

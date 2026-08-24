@@ -46,6 +46,7 @@ import type { Alert, AlertStatus, Device, DeviceStatus, Profile, ProfileSource, 
 
 type View = "dashboard" | "devices" | "usage" | "profiles" | "alerts" | "settings";
 type DeviceSnapshotSource = "demo" | "omada" | "omada-pp";
+type ProfileSuggestionSourceFilter = "all" | ProfileSource;
 type SnapshotHistorySourceFilter = "all" | DeviceSnapshotSource;
 type SnapshotReviewQueueSeverityFilter = "all" | SnapshotReviewQueueItem["severity"];
 type SnapshotStorageLimits = {
@@ -185,6 +186,16 @@ type ActivityEntry = {
   id: string;
   message: string;
   timestamp: string;
+};
+
+type ProfileSuggestionQueueItem = {
+  confidence: DeviceResolution["confidence"];
+  confidenceScore: number;
+  device: Device;
+  profile: Profile;
+  profileSource: ProfileSource;
+  reason: string;
+  usage: number;
 };
 
 const navItems: Array<{ id: View; label: string; icon: LucideIcon }> = [
@@ -600,6 +611,10 @@ export default function Home() {
   const resolutionByDeviceId = useMemo(
     () => new Map(resolutions.map((resolution) => [resolution.deviceId, resolution])),
     [resolutions]
+  );
+  const profileSuggestionQueue = useMemo(
+    () => buildProfileSuggestionQueue(devices, resolutionByDeviceId, profileById),
+    [devices, profileById, resolutionByDeviceId]
   );
 
   const filteredDevices = useMemo(() => {
@@ -1356,6 +1371,24 @@ export default function Home() {
     addActivity(setActivity, `Assigned ${getDeviceLabel(deviceId, devices)} to ${profile?.displayName ?? "owner"}`);
   };
 
+  const assignSuggestedProfiles = (items: ProfileSuggestionQueueItem[]) => {
+    if (items.length === 0) {
+      setNotice("No suggestions selected");
+      return;
+    }
+
+    setProfileOverrides((current) => ({
+      ...current,
+      ...Object.fromEntries(items.map((item) => [item.device.id, item.profile.id]))
+    }));
+    setStatusOverrides((current) => ({
+      ...current,
+      ...Object.fromEntries(items.map((item) => [item.device.id, "claimed" as DeviceStatus]))
+    }));
+    setNotice("Suggestions assigned");
+    addActivity(setActivity, `Assigned ${items.length} suggested ${items.length === 1 ? "owner" : "owners"}`);
+  };
+
   const importCsvProfiles = (nextProfiles: Profile[]) => {
     if (nextProfiles.length === 0) {
       setNotice("No profiles imported");
@@ -1618,12 +1651,14 @@ export default function Home() {
             maxUsage={maxUsage}
             onAssignDevice={assignDevice}
             onBlockDevice={blockDevice}
+            onBulkAssignSuggestions={assignSuggestedProfiles}
             onSelectDevice={setSelectedDeviceId}
             onSetDeviceRisk={setDeviceRisk}
             onSetAlertStatus={setAlertStatus}
             ownerMix={ownerMix}
             profileById={profileById}
             profiles={profiles}
+            profileSuggestionQueue={profileSuggestionQueue}
             activity={activity}
             alerts={alerts}
             resolutionByDeviceId={resolutionByDeviceId}
@@ -1637,10 +1672,12 @@ export default function Home() {
             maxUsage={maxUsage}
             onAssignDevice={assignDevice}
             onBlockDevice={blockDevice}
+            onBulkAssignSuggestions={assignSuggestedProfiles}
             onSelectDevice={setSelectedDeviceId}
             onSetDeviceRisk={setDeviceRisk}
             profileById={profileById}
             profiles={profiles}
+            profileSuggestionQueue={profileSuggestionQueue}
             resolutionByDeviceId={resolutionByDeviceId}
             selectedDeviceId={selectedDeviceId}
           />
@@ -1863,12 +1900,14 @@ function DashboardView({
   maxUsage,
   onAssignDevice,
   onBlockDevice,
+  onBulkAssignSuggestions,
   onSelectDevice,
   onSetAlertStatus,
   onSetDeviceRisk,
   ownerMix,
   profileById,
   profiles,
+  profileSuggestionQueue,
   resolutionByDeviceId,
   selectedDevice,
   selectedDeviceId
@@ -1879,12 +1918,14 @@ function DashboardView({
   maxUsage: number;
   onAssignDevice: (deviceId: string, profileId: string) => void;
   onBlockDevice: (deviceId: string) => void;
+  onBulkAssignSuggestions: (items: ProfileSuggestionQueueItem[]) => void;
   onSelectDevice: (deviceId: string) => void;
   onSetAlertStatus: (alertId: string, status: AlertStatus) => void;
   onSetDeviceRisk: (deviceId: string, riskState: RiskState) => void;
   ownerMix: Array<{ label: string; value: number }>;
   profileById: Map<string, Profile>;
   profiles: Profile[];
+  profileSuggestionQueue: ProfileSuggestionQueueItem[];
   resolutionByDeviceId: Map<string, DeviceResolution>;
   selectedDevice: Device;
   selectedDeviceId: string;
@@ -1911,6 +1952,13 @@ function DashboardView({
           profiles={profiles}
           resolution={resolutionByDeviceId.get(selectedDevice.id)}
         />
+        <ProfileSuggestionQueue
+          items={profileSuggestionQueue}
+          limit={4}
+          onAssign={(item) => onAssignDevice(item.device.id, item.profile.id)}
+          onBulkAssign={onBulkAssignSuggestions}
+          onSelectDevice={onSelectDevice}
+        />
         <OwnerMix ownerMix={ownerMix} />
         <AlertQueue alerts={alerts} limit={3} onSetAlertStatus={onSetAlertStatus} />
         <ActivityLog activity={activity} />
@@ -1924,10 +1972,12 @@ function DevicesView({
   maxUsage,
   onAssignDevice,
   onBlockDevice,
+  onBulkAssignSuggestions,
   onSelectDevice,
   onSetDeviceRisk,
   profileById,
   profiles,
+  profileSuggestionQueue,
   resolutionByDeviceId,
   selectedDeviceId
 }: {
@@ -1935,10 +1985,12 @@ function DevicesView({
   maxUsage: number;
   onAssignDevice: (deviceId: string, profileId: string) => void;
   onBlockDevice: (deviceId: string) => void;
+  onBulkAssignSuggestions: (items: ProfileSuggestionQueueItem[]) => void;
   onSelectDevice: (deviceId: string) => void;
   onSetDeviceRisk: (deviceId: string, riskState: RiskState) => void;
   profileById: Map<string, Profile>;
   profiles: Profile[];
+  profileSuggestionQueue: ProfileSuggestionQueueItem[];
   resolutionByDeviceId: Map<string, DeviceResolution>;
   selectedDeviceId: string;
 }) {
@@ -1968,6 +2020,12 @@ function DevicesView({
         ) : (
           <EmptyPanel />
         )}
+        <ProfileSuggestionQueue
+          items={profileSuggestionQueue}
+          onAssign={(item) => onAssignDevice(item.device.id, item.profile.id)}
+          onBulkAssign={onBulkAssignSuggestions}
+          onSelectDevice={onSelectDevice}
+        />
       </div>
     </section>
   );
@@ -4075,6 +4133,94 @@ function EmptyPanel() {
   );
 }
 
+function ProfileSuggestionQueue({
+  items,
+  limit,
+  onAssign,
+  onBulkAssign,
+  onSelectDevice
+}: {
+  items: ProfileSuggestionQueueItem[];
+  limit?: number;
+  onAssign: (item: ProfileSuggestionQueueItem) => void;
+  onBulkAssign: (items: ProfileSuggestionQueueItem[]) => void;
+  onSelectDevice: (deviceId: string) => void;
+}) {
+  const [sourceFilter, setSourceFilter] = useState<ProfileSuggestionSourceFilter>("all");
+  const sourceCounts = useMemo(
+    () => ({
+      all: items.length,
+      csv: items.filter((item) => item.profileSource === "csv").length,
+      demo: items.filter((item) => item.profileSource === "demo").length
+    }),
+    [items]
+  );
+  const filteredItems = sourceFilter === "all" ? items : items.filter((item) => item.profileSource === sourceFilter);
+  const shownItems = typeof limit === "number" ? filteredItems.slice(0, limit) : filteredItems;
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <h3>Profile Suggestions</h3>
+          <p>{filteredItems.length} roster-based {filteredItems.length === 1 ? "match" : "matches"}.</p>
+        </div>
+        <UserPlus size={20} color="var(--teal-dark)" />
+      </div>
+
+      <div className="queue-filter-group compact" aria-label="Suggestion source filter">
+        {(["all", "csv", "demo"] as ProfileSuggestionSourceFilter[]).map((source) => (
+          <button
+            className={sourceFilter === source ? "active" : ""}
+            key={source}
+            onClick={() => setSourceFilter(source)}
+            type="button"
+          >
+            {source === "all" ? "All" : source.toUpperCase()}
+            <strong>{sourceCounts[source]}</strong>
+          </button>
+        ))}
+      </div>
+
+      {shownItems.length ? (
+        <>
+          <div className="list suggestion-queue-list">
+            {shownItems.map((item) => (
+              <div className="list-item suggestion-queue-item" key={item.device.id}>
+                <div className="list-title">
+                  <strong>{item.device.hostname}</strong>
+                  <span className={`confidence-pill ${item.confidence}`}>{item.confidence} {item.confidenceScore}%</span>
+                </div>
+                <p>{item.profile.displayName} · {item.profile.organizationName ?? item.profile.profileType}</p>
+                <p>{item.reason} · {formatBytes(item.usage)} · {item.device.ssid}</p>
+                <div className="inline-actions">
+                  <span>{item.profileSource.toUpperCase()} roster</span>
+                  <button onClick={() => onSelectDevice(item.device.id)} type="button">Inspect</button>
+                  <button onClick={() => onAssign(item)} type="button">Assign</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            className="text-button"
+            disabled={shownItems.length === 0}
+            onClick={() => onBulkAssign(shownItems)}
+            type="button"
+          >
+            <UserPlus size={17} />
+            Assign Visible
+          </button>
+        </>
+      ) : (
+        <div className="empty-state compact-empty">
+          <strong>No profile suggestions</strong>
+          <p>Import a roster or inspect unknown hostnames to build suggested owner matches.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function OwnerMix({ ownerMix }: { ownerMix: Array<{ label: string; value: number }> }) {
   return (
     <section className="panel">
@@ -4243,6 +4389,35 @@ function getOwnerMix(profiles: Profile[]) {
     { label: "Staff", value: profiles.filter((profile) => profile.profileType === "staff").length },
     { label: "Agents", value: profiles.filter((profile) => profile.profileType === "agent").length }
   ];
+}
+
+function buildProfileSuggestionQueue(
+  devices: Device[],
+  resolutionByDeviceId: Map<string, DeviceResolution>,
+  profileById: Map<string, Profile>
+): ProfileSuggestionQueueItem[] {
+  return devices
+    .map((device) => {
+      if (device.profileId) return undefined;
+      const resolution = resolutionByDeviceId.get(device.id);
+      if (!resolution?.profileId) return undefined;
+      const profile = profileById.get(resolution.profileId);
+      if (!profile) return undefined;
+      const suggestionEvidence = resolution.evidence.find((item) => item.type === "suggested_profile");
+      if (!suggestionEvidence) return undefined;
+
+      return {
+        confidence: resolution.confidence,
+        confidenceScore: resolution.confidenceScore,
+        device,
+        profile,
+        profileSource: getProfileSource(profile),
+        reason: suggestionEvidence.label.replace(/^Suggested owner:\s*/i, "Matched"),
+        usage: device.rxBytes + device.txBytes
+      };
+    })
+    .filter((item): item is ProfileSuggestionQueueItem => Boolean(item))
+    .sort((a, b) => b.confidenceScore - a.confidenceScore || b.usage - a.usage || a.device.hostname.localeCompare(b.device.hostname));
 }
 
 function getProfileSource(profile: Profile): ProfileSource {
