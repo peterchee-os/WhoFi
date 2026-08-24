@@ -29,6 +29,10 @@ export async function writeSnapshotReviewPolicy(
   return nextPolicy;
 }
 
+export async function resetSnapshotReviewPolicy(env: NodeJS.ProcessEnv = process.env): Promise<SnapshotReviewPolicy> {
+  return writeSnapshotReviewPolicy(defaultSnapshotReviewPolicy, env);
+}
+
 function getSnapshotReviewPolicyPath(env: NodeJS.ProcessEnv) {
   return env.WHOFI_SNAPSHOT_REVIEW_POLICY_PATH || join(process.cwd(), ".whofi", "snapshot-review-policy.json");
 }

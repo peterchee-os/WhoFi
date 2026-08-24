@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -280,6 +280,7 @@ const seededEmailDeliveries: EmailDelivery[] = [
 ];
 
 export default function Home() {
+  const snapshotReviewPolicyImportRef = useRef<HTMLInputElement>(null);
   const [activeView, setActiveView] = useState<View>("dashboard");
   const [query, setQuery] = useState("");
   const [selectedDeviceId, setSelectedDeviceId] = useState("dev-unknown-burst");
@@ -793,6 +794,93 @@ export default function Home() {
     }
   };
 
+  const exportSnapshotReviewPolicy = () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      policy: snapshotReviewPolicy,
+      schema: "whofi.snapshot-review-policy.v1"
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "whofi-snapshot-review-policy.json";
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setNotice("Review policy exported");
+    addActivity(setActivity, "Exported snapshot review policy");
+  };
+
+  const importSnapshotReviewPolicy = async (file?: File | null) => {
+    if (!file) return;
+
+    setSnapshotReviewPolicyState({
+      message: "Importing policy",
+      status: "testing"
+    });
+
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      const policy = getImportedSnapshotReviewPolicy(parsed);
+      if (!policy) {
+        throw new Error("Invalid review policy import");
+      }
+
+      await updateSnapshotReviewPolicy(policy);
+      setNotice("Review policy imported");
+      addActivity(setActivity, "Imported snapshot review policy");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Review policy import failed";
+      setSnapshotReviewPolicyState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Review policy import failed");
+    } finally {
+      if (snapshotReviewPolicyImportRef.current) {
+        snapshotReviewPolicyImportRef.current.value = "";
+      }
+    }
+  };
+
+  const resetSnapshotReviewPolicy = async () => {
+    setSnapshotReviewPolicyState({
+      message: "Resetting policy",
+      status: "testing"
+    });
+
+    try {
+      const response = await fetch("/api/snapshot-history/review-policy", {
+        method: "DELETE"
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        policy?: SnapshotReviewPolicy;
+      };
+      if (!response.ok || !payload.policy) {
+        throw new Error(payload.error ?? "Review policy reset failed");
+      }
+
+      setSnapshotReviewPolicy(payload.policy);
+      setSnapshotReviewPolicyState({
+        message: "Policy reset",
+        status: "success",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Review policy reset");
+      addActivity(setActivity, "Reset snapshot review policy");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Review policy reset failed";
+      setSnapshotReviewPolicyState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Review policy reset failed");
+    }
+  };
+
   const useSelectedSnapshotCapture = () => {
     if (!selectedSnapshotCapture) return;
     const snapshot = selectedSnapshotCapture.deviceSnapshot;
@@ -1263,10 +1351,14 @@ export default function Home() {
             onDeleteSelectedSnapshotCapture={deleteSelectedSnapshotCapture}
             onExportSelectedSnapshotCapture={exportSelectedSnapshotCapture}
             onExportSelectedSnapshotReport={exportSelectedSnapshotReport}
+            onExportSnapshotReviewPolicy={exportSnapshotReviewPolicy}
             onExportSnapshotReviewQueueReport={exportSnapshotReviewQueueReport}
             onExportSnapshotTrendReport={exportSnapshotTrendReport}
+            onImportSnapshotReviewPolicy={importSnapshotReviewPolicy}
             onLoadSnapshotCapture={loadSnapshotCapture}
             onMarkVisibleSnapshotQueueReviewed={markVisibleSnapshotQueueReviewed}
+            onOpenSnapshotReviewPolicyImport={() => snapshotReviewPolicyImportRef.current?.click()}
+            onResetSnapshotReviewPolicy={resetSnapshotReviewPolicy}
             onSnapshotReviewNoteChange={setSnapshotReviewNoteDraft}
             onUpdateSnapshotReview={updateSelectedSnapshotReview}
             onUpdateSnapshotReviewPolicy={updateSnapshotReviewPolicy}
@@ -1280,6 +1372,7 @@ export default function Home() {
             snapshotCaptureState={snapshotCaptureState}
             snapshotHistory={snapshotHistory}
             snapshotReviewPolicy={snapshotReviewPolicy}
+            snapshotReviewPolicyImportRef={snapshotReviewPolicyImportRef}
             snapshotReviewPolicyState={snapshotReviewPolicyState}
             snapshotReviewNoteDraft={snapshotReviewNoteDraft}
           />
@@ -1552,10 +1645,14 @@ function UsageView({
   onDeleteSelectedSnapshotCapture,
   onExportSelectedSnapshotCapture,
   onExportSelectedSnapshotReport,
+  onExportSnapshotReviewPolicy,
   onExportSnapshotReviewQueueReport,
   onExportSnapshotTrendReport,
+  onImportSnapshotReviewPolicy,
   onLoadSnapshotCapture,
   onMarkVisibleSnapshotQueueReviewed,
+  onOpenSnapshotReviewPolicyImport,
+  onResetSnapshotReviewPolicy,
   onSnapshotReviewNoteChange,
   onUpdateSnapshotReview,
   onUpdateSnapshotReviewPolicy,
@@ -1569,6 +1666,7 @@ function UsageView({
   snapshotCaptureState,
   snapshotHistory,
   snapshotReviewPolicy,
+  snapshotReviewPolicyImportRef,
   snapshotReviewPolicyState,
   snapshotReviewNoteDraft
 }: {
@@ -1576,13 +1674,17 @@ function UsageView({
   onDeleteSelectedSnapshotCapture: () => void;
   onExportSelectedSnapshotCapture: () => void;
   onExportSelectedSnapshotReport: () => void;
+  onExportSnapshotReviewPolicy: () => void;
   onExportSnapshotReviewQueueReport: (
     sourceFilter: SnapshotHistorySourceFilter,
     severityFilter: SnapshotReviewQueueSeverityFilter
   ) => void;
   onExportSnapshotTrendReport: (sourceFilter: SnapshotHistorySourceFilter) => void;
+  onImportSnapshotReviewPolicy: (file?: File | null) => void;
   onLoadSnapshotCapture: (entryId: string) => void;
   onMarkVisibleSnapshotQueueReviewed: (ids: string[]) => void;
+  onOpenSnapshotReviewPolicyImport: () => void;
+  onResetSnapshotReviewPolicy: () => void;
   onSnapshotReviewNoteChange: (value: string) => void;
   onUpdateSnapshotReview: (reviewed?: boolean) => void;
   onUpdateSnapshotReviewPolicy: (policy: SnapshotReviewPolicy) => void;
@@ -1596,6 +1698,7 @@ function UsageView({
   snapshotCaptureState: IntegrationTestState;
   snapshotHistory: SnapshotHistoryEntry[];
   snapshotReviewPolicy: SnapshotReviewPolicy;
+  snapshotReviewPolicyImportRef: RefObject<HTMLInputElement>;
   snapshotReviewPolicyState: IntegrationTestState;
   snapshotReviewNoteDraft: string;
 }) {
@@ -1684,7 +1787,12 @@ function UsageView({
         />
 
         <SnapshotReviewPolicyPanel
+          importInputRef={snapshotReviewPolicyImportRef}
           onChange={onUpdateSnapshotReviewPolicy}
+          onExport={onExportSnapshotReviewPolicy}
+          onImport={onImportSnapshotReviewPolicy}
+          onImportClick={onOpenSnapshotReviewPolicyImport}
+          onReset={onResetSnapshotReviewPolicy}
           policy={snapshotReviewPolicy}
           state={snapshotReviewPolicyState}
         />
@@ -2135,11 +2243,21 @@ function SnapshotReviewQueuePanel({
 }
 
 function SnapshotReviewPolicyPanel({
+  importInputRef,
   onChange,
+  onExport,
+  onImport,
+  onImportClick,
+  onReset,
   policy,
   state
 }: {
+  importInputRef: RefObject<HTMLInputElement>;
   onChange: (policy: SnapshotReviewPolicy) => void;
+  onExport: () => void;
+  onImport: (file?: File | null) => void;
+  onImportClick: () => void;
+  onReset: () => void;
   policy: SnapshotReviewPolicy;
   state: IntegrationTestState;
 }) {
@@ -2161,6 +2279,24 @@ function SnapshotReviewPolicyPanel({
         <span className={`integration-state ${state.status}`}>
           {state.status === "success" ? "Saved" : state.status === "error" ? "Error" : "Ready"}
         </span>
+      </div>
+      <div className="policy-actions">
+        <button className="text-button slim" onClick={onExport} type="button">
+          Export Policy
+        </button>
+        <button className="text-button slim" onClick={onImportClick} type="button">
+          Import Policy
+        </button>
+        <button className="text-button slim" onClick={onReset} type="button">
+          Reset
+        </button>
+        <input
+          accept="application/json,.json"
+          className="hidden-file-input"
+          onChange={(event) => onImport(event.target.files?.[0])}
+          ref={importInputRef}
+          type="file"
+        />
       </div>
       <div className="policy-form">
         <label className="toggle-row">
@@ -3499,6 +3635,52 @@ function getDeviceSourceTitle(source: DeviceSnapshotSource, liveSourceAccess: Li
   if (!liveSourceAccess.loaded) return "Checking live source access";
   if (!liveSourceAccess.enabled) return "Live snapshots disabled";
   return `Capture ${formatDeviceSourceLabel(source)} devices`;
+}
+
+function getImportedSnapshotReviewPolicy(value: unknown): SnapshotReviewPolicy | undefined {
+  const candidate = value && typeof value === "object" && "policy" in value
+    ? (value as { policy?: unknown }).policy
+    : value;
+
+  if (!candidate || typeof candidate !== "object") return undefined;
+  const policy = candidate as Partial<SnapshotReviewPolicy>;
+  const knownKeys = [
+    "highUsageBytes",
+    "reviewSignalThreshold",
+    "triggerOnHighUsage",
+    "triggerOnReviewSignals",
+    "triggerOnUnknownDevices",
+    "unknownDeviceThreshold"
+  ];
+  const hasKnownKey = knownKeys.some((key) => key in policy);
+  if (!hasKnownKey) return undefined;
+
+  return {
+    highUsageBytes:
+      typeof policy.highUsageBytes === "number" && Number.isFinite(policy.highUsageBytes)
+        ? policy.highUsageBytes
+        : defaultSnapshotReviewPolicy.highUsageBytes,
+    reviewSignalThreshold:
+      typeof policy.reviewSignalThreshold === "number" && Number.isFinite(policy.reviewSignalThreshold)
+        ? policy.reviewSignalThreshold
+        : defaultSnapshotReviewPolicy.reviewSignalThreshold,
+    triggerOnHighUsage:
+      typeof policy.triggerOnHighUsage === "boolean"
+        ? policy.triggerOnHighUsage
+        : defaultSnapshotReviewPolicy.triggerOnHighUsage,
+    triggerOnReviewSignals:
+      typeof policy.triggerOnReviewSignals === "boolean"
+        ? policy.triggerOnReviewSignals
+        : defaultSnapshotReviewPolicy.triggerOnReviewSignals,
+    triggerOnUnknownDevices:
+      typeof policy.triggerOnUnknownDevices === "boolean"
+        ? policy.triggerOnUnknownDevices
+        : defaultSnapshotReviewPolicy.triggerOnUnknownDevices,
+    unknownDeviceThreshold:
+      typeof policy.unknownDeviceThreshold === "number" && Number.isFinite(policy.unknownDeviceThreshold)
+        ? policy.unknownDeviceThreshold
+        : defaultSnapshotReviewPolicy.unknownDeviceThreshold
+  };
 }
 
 function mergeSnapshotHistory(...entrySets: SnapshotHistoryEntry[][]) {

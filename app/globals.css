@@ -900,8 +900,21 @@ textarea {
   align-items: center;
 }
 
+.policy-actions {
+  border-top: 1px solid var(--line);
+  padding: 12px 18px 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .policy-form .select-field input {
   min-height: 34px;
+}
+
+.hidden-file-input {
+  display: none;
 }
 
 .trend-summary {

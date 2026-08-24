@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuthStatus } from "@/lib/admin-auth";
 import { normalizeSnapshotReviewPolicy, type SnapshotReviewPolicy } from "@/lib/snapshot-history";
-import { readSnapshotReviewPolicy, writeSnapshotReviewPolicy } from "@/lib/snapshot-review-policy-store";
+import {
+  readSnapshotReviewPolicy,
+  resetSnapshotReviewPolicy,
+  writeSnapshotReviewPolicy
+} from "@/lib/snapshot-review-policy-store";
 
 export const runtime = "nodejs";
 
@@ -50,6 +54,24 @@ export async function PATCH(request: NextRequest) {
 
   return NextResponse.json({
     policy: await writeSnapshotReviewPolicy(normalizeSnapshotReviewPolicy(body))
+  });
+}
+
+export async function DELETE(request: NextRequest) {
+  const adminStatus = getAdminAuthStatus(request);
+  if (!adminStatus.authenticated) {
+    return NextResponse.json(
+      {
+        error: "Admin authentication required"
+      },
+      {
+        status: adminStatus.configured ? 401 : 503
+      }
+    );
+  }
+
+  return NextResponse.json({
+    policy: await resetSnapshotReviewPolicy()
   });
 }
 
