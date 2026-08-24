@@ -29,6 +29,7 @@ import { formatBytes, formatRelativeTime, percent } from "@/lib/format";
 import { integrationCatalog, type IntegrationCatalogItem } from "@/lib/integrations/catalog";
 import { resolveDevices, type DeviceResolution } from "@/lib/resolution";
 import { buildSessionSnapshot, type SessionSnapshot, type UsageRollup, type UsageRollupDimension } from "@/lib/session-rollups";
+import { buildSnapshotTrends, type SnapshotTrendReport } from "@/lib/snapshot-trends";
 import {
   buildSnapshotReviewQueue,
   buildSnapshotReviewQueueSummary,
@@ -1600,6 +1601,10 @@ function UsageView({
     () => buildSnapshotReviewQueueSummary(snapshotHistory, snapshotReviewQueue),
     [snapshotHistory, snapshotReviewQueue]
   );
+  const snapshotTrends = useMemo(
+    () => buildSnapshotTrends(snapshotHistory, snapshotReviewPolicy, historySourceFilter),
+    [historySourceFilter, snapshotHistory, snapshotReviewPolicy]
+  );
 
   return (
     <section className="content-grid usage-layout">
@@ -1667,6 +1672,7 @@ function UsageView({
       </div>
 
       <div className="usage-rollup-grid">
+        <SnapshotTrendsPanel trends={snapshotTrends} />
         <SnapshotCapturePanel
           capture={selectedSnapshotCapture}
           comparison={selectedSnapshotComparison}
@@ -1738,6 +1744,64 @@ function UsageRollupPanel({
             </p>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function SnapshotTrendsPanel({ trends }: { trends: SnapshotTrendReport }) {
+  const visiblePoints = [...trends.points].reverse().slice(0, 6);
+
+  return (
+    <div className="panel">
+      <div className="panel-header">
+        <div>
+          <h3>Snapshot Trends</h3>
+          <p>{trends.summary.captures} captures · {trends.source === "all" ? "All sources" : formatDeviceSourceLabel(trends.source)}</p>
+        </div>
+        <Activity size={20} color="var(--teal-dark)" />
+      </div>
+      <div className="usage-summary trend-summary">
+        <div>
+          <span>Open reviews</span>
+          <strong>{trends.summary.openReviews}</strong>
+        </div>
+        <div>
+          <span>Reviewed</span>
+          <strong>{trends.summary.reviewedCaptures}</strong>
+        </div>
+        <div>
+          <span>Usage delta</span>
+          <strong>{formatSignedBytes(trends.summary.totalBytesDelta)}</strong>
+        </div>
+        <div>
+          <span>Latest unknown</span>
+          <strong>{formatSignedNumber(trends.summary.latestUnknownDelta)}</strong>
+        </div>
+      </div>
+      <div className="trend-list">
+        {visiblePoints.length ? (
+          visiblePoints.map((point) => (
+            <div className="trend-row" key={point.id}>
+              <div>
+                <strong>{formatDeviceSourceLabel(point.source)}</strong>
+                <span><RelativeTime value={point.observedAt} /></span>
+              </div>
+              <div>
+                <span>{point.onlineDevices} devices</span>
+                <span>{point.unknownDevices} unknown</span>
+                <span>{formatBytes(point.totalBytes)}</span>
+              </div>
+              <span className={`metric-pill ${point.reviewed ? "up" : point.reviewSignals > 0 ? "warning" : "watch"}`}>
+                {point.reviewed ? "done" : `${point.reviewSignals}`}
+              </span>
+            </div>
+          ))
+        ) : (
+          <div className="list-item compact-item">
+            <p>No stored captures yet.</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -3462,6 +3526,12 @@ function formatHistoryDelta(delta: number) {
 function formatSignedNumber(delta: number) {
   if (delta > 0) return `+${delta}`;
   if (delta < 0) return `${delta}`;
+  return "Base";
+}
+
+function formatSignedBytes(delta: number) {
+  if (delta > 0) return `+${formatBytes(delta)}`;
+  if (delta < 0) return `-${formatBytes(Math.abs(delta))}`;
   return "Base";
 }
 
