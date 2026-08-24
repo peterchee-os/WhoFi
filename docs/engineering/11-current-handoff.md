@@ -14,7 +14,7 @@ Latest completed slices:
 - search across device, owner, profile, and network fields
 - Settings CSV/TSV roster preview and local active-profile import for demo/small-event workflows
 - Profiles source filters plus imported CSV roster export/clear actions
-- Profiles device owner binding CSV/TSV export and preview/confirm import for local review handoff and demo recovery
+- Profiles device owner binding CSV/TSV export and row-level preview/confirm import for local review handoff and demo recovery
 - profile-link suggestions from hostname/person/org evidence with inspector `Assign Suggested`, Dashboard/Devices queue review, source filters, visible-batch assignment/ignore/export, ignored false-positive persistence, and restore ignored action
 - device inspection panel
 - dashboard source switcher for Demo, Omada, and optional Omada Printing Press CLI snapshots

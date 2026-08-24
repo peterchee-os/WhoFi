@@ -72,9 +72,21 @@ type PendingSnapshotArchiveImport = {
 };
 type DeviceBindingImportSummary = {
   matched: number;
+  matchedRows: DeviceBindingImportMatchedRow[];
   profileOverrides: Record<string, string>;
   skipped: number;
+  skippedRows: DeviceBindingImportSkippedRow[];
   statusOverrides: Record<string, DeviceStatus>;
+};
+type DeviceBindingImportMatchedRow = {
+  deviceId: string;
+  deviceLabel: string;
+  profileId: string;
+  profileLabel: string;
+};
+type DeviceBindingImportSkippedRow = {
+  reason: string;
+  rowNumber: number;
 };
 type PendingDeviceBindingImport = {
   fileName: string;
@@ -3392,6 +3404,41 @@ function DeviceBindingImportPreview({
       <p>
         Confirming will assign matched devices to matched profiles in local review state. Skipped rows were not written.
       </p>
+      <div className="device-change-grid">
+        <div className="device-change-list">
+          <div className="device-change-header">
+            <strong>Matched Rows</strong>
+            <span className="metric-pill">{pendingImport.summary.matchedRows.length}</span>
+          </div>
+          {pendingImport.summary.matchedRows.slice(0, 5).map((row) => (
+            <div className="device-change-row" key={`${row.deviceId}-${row.profileId}`}>
+              <div>
+                <strong className="truncate">{row.deviceLabel}</strong>
+                <span className="truncate">{row.deviceId}</span>
+              </div>
+              <span className="truncate">{row.profileLabel}</span>
+            </div>
+          ))}
+        </div>
+        <div className="device-change-list">
+          <div className="device-change-header">
+            <strong>Skipped Rows</strong>
+            <span className="metric-pill">{pendingImport.summary.skippedRows.length}</span>
+          </div>
+          {pendingImport.summary.skippedRows.length ? (
+            pendingImport.summary.skippedRows.slice(0, 5).map((row) => (
+              <div className="device-change-row" key={`${row.rowNumber}-${row.reason}`}>
+                <div>
+                  <strong>Row {row.rowNumber}</strong>
+                  <span>{row.reason}</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p>No skipped rows.</p>
+          )}
+        </div>
+      </div>
       <div className="archive-import-actions">
         <button className="text-button slim" onClick={onCancel} type="button">
           Cancel
@@ -4776,29 +4823,44 @@ function importDeviceBindingRows(input: string, devices: Device[], profiles: Pro
       .map((profile) => [normalizeLookup(profile.email as string), profile])
   );
   const profileByName = new Map(profiles.map((profile) => [normalizeLookup(profile.displayName), profile]));
+  const matchedRows: DeviceBindingImportMatchedRow[] = [];
   const profileOverrides: Record<string, string> = {};
+  const skippedRows: DeviceBindingImportSkippedRow[] = [];
   const statusOverrides: Record<string, DeviceStatus> = {};
   let matched = 0;
   let skipped = 0;
 
-  for (const row of rows) {
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
     const device = findImportDevice(row, deviceById, deviceByMac, deviceByHostname);
     const profile = findImportProfile(row, profileById, profileByEmail, profileByName);
 
     if (!device || !profile) {
       skipped += 1;
+      skippedRows.push({
+        reason: !device && !profile ? "Device and profile not found" : !device ? "Device not found" : "Profile not found",
+        rowNumber: index + 2
+      });
       continue;
     }
 
     profileOverrides[device.id] = profile.id;
     statusOverrides[device.id] = "claimed";
+    matchedRows.push({
+      deviceId: device.id,
+      deviceLabel: device.hostname,
+      profileId: profile.id,
+      profileLabel: profile.displayName
+    });
     matched += 1;
   }
 
   return {
     matched,
+    matchedRows,
     profileOverrides,
     skipped,
+    skippedRows,
     statusOverrides
   };
 }
