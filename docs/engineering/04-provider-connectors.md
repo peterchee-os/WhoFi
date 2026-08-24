@@ -267,7 +267,7 @@ Current implementation state:
 - demo-safe shape endpoint exists at `/api/observations/meraki/shape`
 - server-side live test endpoint exists at `/api/observations/meraki/test`
 - Settings integration card can test the normalized output shape
-- live test route is not exposed in the UI until provider config exists for both Omada and Meraki
+- live test route is admin-gated and intended for configured operator deployments, not public demos
 - live Meraki API client scaffolding exists for read-only client observations
 - no production sync scheduler yet
 
@@ -426,9 +426,10 @@ Current implementation state:
 - exact normalizer module exists at `lib/integrations/identity/csv`
 - demo-safe shape endpoint exists at `/api/profiles/csv/shape`
 - preview endpoint exists at `/api/profiles/csv/preview`
-- Settings integration card can test normalized output from a fake CSV roster
+- Settings can preview pasted CSV/TSV rosters, then import parsed people into the browser-local active profile roster
+- Profiles can export/clear imported CSV profiles and preview/import device owner bindings for local handoff workflows
 - parser supports comma-delimited and tab-delimited input with quoted fields
-- no production upload UI or persisted import job yet
+- no server-persisted production import job yet
 
 ## Demo Provider
 

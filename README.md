@@ -68,7 +68,7 @@ WHOFI_ADMIN_PASSWORD=...
 WHOFI_ADMIN_SESSION_SECRET=...
 ```
 
-When enabled, the app shows an admin sign-in screen before exposing the dashboard. Sensitive provider and live snapshot routes also require the signed admin session. `WHOFI_LIVE_DEVICE_SOURCE_TOKEN` remains a separate per-request live snapshot token, useful for an extra operator-controlled gate around real client data.
+When enabled, the app shows an admin sign-in screen before exposing the dashboard. Sensitive provider, live snapshot, notification, and local snapshot-history routes also require the signed admin session. `WHOFI_LIVE_DEVICE_SOURCE_TOKEN` remains a separate per-request live snapshot token, useful for an extra operator-controlled gate around real client data.
 
 ## Snapshot History
 

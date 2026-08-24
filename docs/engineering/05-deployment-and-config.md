@@ -195,7 +195,7 @@ WHOFI_ADMIN_PASSWORD=...
 WHOFI_ADMIN_SESSION_SECRET=...
 ```
 
-When enabled, WhoFi serves an admin sign-in screen before the dashboard and requires the signed admin session cookie for provider readiness, live observation test routes, notification tests, `/api/devices`, and `/api/sessions`. Use a random `WHOFI_ADMIN_SESSION_SECRET` distinct from the password. If it is omitted, the password signs sessions, which is only acceptable for throwaway local testing.
+When enabled, WhoFi serves an admin sign-in screen before the dashboard and requires the signed admin session cookie for provider readiness, live observation test routes, notification tests, `/api/devices`, `/api/sessions`, and local snapshot-history/review-policy routes. Use a random `WHOFI_ADMIN_SESSION_SECRET` distinct from the password. If it is omitted, the password signs sessions, which is only acceptable for throwaway local testing.
 
 Current implementation state:
 
