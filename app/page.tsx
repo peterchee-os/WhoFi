@@ -31,11 +31,13 @@ import { resolveDevices, type DeviceResolution } from "@/lib/resolution";
 import { buildSessionSnapshot, type SessionSnapshot, type UsageRollup, type UsageRollupDimension } from "@/lib/session-rollups";
 import {
   buildSnapshotReviewQueue,
+  buildSnapshotReviewQueueSummary,
   createSnapshotHistoryEntry,
   type SnapshotCaptureComparison,
   type SnapshotCaptureRecord,
   type SnapshotHistoryEntry,
-  type SnapshotReviewQueueItem
+  type SnapshotReviewQueueItem,
+  type SnapshotReviewQueueSummary
 } from "@/lib/snapshot-history";
 import type { Alert, AlertStatus, Device, DeviceStatus, Profile, RiskState } from "@/lib/types";
 
@@ -1389,6 +1391,10 @@ function UsageView({
   );
   const snapshotHistoryCounts = useMemo(() => getSnapshotHistoryCounts(snapshotHistory), [snapshotHistory]);
   const snapshotReviewQueue = useMemo(() => buildSnapshotReviewQueue(snapshotHistory), [snapshotHistory]);
+  const snapshotReviewQueueSummary = useMemo(
+    () => buildSnapshotReviewQueueSummary(snapshotHistory, snapshotReviewQueue),
+    [snapshotHistory, snapshotReviewQueue]
+  );
 
   return (
     <section className="content-grid usage-layout">
@@ -1425,6 +1431,7 @@ function UsageView({
           items={snapshotReviewQueue}
           onLoadCapture={onLoadSnapshotCapture}
           selectedEntryId={selectedSnapshotCaptureId}
+          summary={snapshotReviewQueueSummary}
         />
 
         <SnapshotHistoryPanel
@@ -1668,11 +1675,13 @@ function SnapshotCapturePanel({
 function SnapshotReviewQueuePanel({
   items,
   onLoadCapture,
-  selectedEntryId
+  selectedEntryId,
+  summary
 }: {
   items: SnapshotReviewQueueItem[];
   onLoadCapture: (entryId: string) => void;
   selectedEntryId: string;
+  summary: SnapshotReviewQueueSummary;
 }) {
   const visibleItems = items.slice(0, 5);
 
@@ -1682,6 +1691,24 @@ function SnapshotReviewQueuePanel({
         <div>
           <h3>Capture Review Queue</h3>
           <p>{items.length} open capture reviews.</p>
+        </div>
+      </div>
+      <div className="review-queue-summary">
+        <div>
+          <span>Open</span>
+          <strong>{summary.open}</strong>
+        </div>
+        <div>
+          <span>Warning</span>
+          <strong>{summary.warning}</strong>
+        </div>
+        <div>
+          <span>Watch</span>
+          <strong>{summary.watch}</strong>
+        </div>
+        <div>
+          <span>Reviewed</span>
+          <strong>{summary.reviewed}</strong>
         </div>
       </div>
       <div className="list">

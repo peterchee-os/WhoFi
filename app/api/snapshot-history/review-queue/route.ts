@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuthStatus } from "@/lib/admin-auth";
-import { buildSnapshotReviewQueue } from "@/lib/snapshot-history";
+import { buildSnapshotReviewQueue, buildSnapshotReviewQueueSummary } from "@/lib/snapshot-history";
 import { readSnapshotHistory } from "@/lib/snapshot-history-store";
 
 export const runtime = "nodejs";
@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     count: queue.length,
-    queue
+    queue,
+    summary: buildSnapshotReviewQueueSummary(entries, queue)
   });
 }

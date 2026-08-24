@@ -69,6 +69,14 @@ export type SnapshotReviewQueueItem = {
   unknownDevices: number;
 };
 
+export type SnapshotReviewQueueSummary = {
+  open: number;
+  reviewed: number;
+  total: number;
+  warning: number;
+  watch: number;
+};
+
 export function buildSnapshotReviewQueue(entries: SnapshotHistoryEntry[]): SnapshotReviewQueueItem[] {
   return entries
     .filter((entry) => !entry.reviewedAt && (entry.reviewSignals > 0 || entry.unknownDevices > 0))
@@ -83,6 +91,19 @@ export function buildSnapshotReviewQueue(entries: SnapshotHistoryEntry[]): Snaps
     }))
     .sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime())
     .slice(0, 12);
+}
+
+export function buildSnapshotReviewQueueSummary(
+  entries: SnapshotHistoryEntry[],
+  queue = buildSnapshotReviewQueue(entries)
+): SnapshotReviewQueueSummary {
+  return {
+    open: queue.length,
+    reviewed: entries.filter((entry) => Boolean(entry.reviewedAt)).length,
+    total: entries.length,
+    warning: queue.filter((item) => item.severity === "warning").length,
+    watch: queue.filter((item) => item.severity === "watch").length
+  };
 }
 
 export function buildSnapshotCaptureComparison(
