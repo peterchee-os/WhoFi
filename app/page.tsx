@@ -52,6 +52,22 @@ type SnapshotStorageLimits = {
   captureLimit: number;
   historyLimit: number;
 };
+type SnapshotArchiveImportSummary = {
+  duplicateCaptures: number;
+  duplicateEntries: number;
+  importableCaptures: number;
+  importableEntries: number;
+  invalidCaptures: number;
+  invalidEntries: number;
+  retainedCapturesAfterImport: number;
+  retainedEntriesAfterImport: number;
+  sourceCounts: Record<string, number>;
+};
+type PendingSnapshotArchiveImport = {
+  archive: unknown;
+  fileName: string;
+  summary: SnapshotArchiveImportSummary;
+};
 type NotificationProviderMode = "disabled" | "console" | "resend";
 type EmailDeliveryStatus = "sent" | "failed" | "disabled" | "rendered";
 type NotificationRuleKey =
@@ -307,6 +323,7 @@ export default function Home() {
     message: "No capture selected",
     status: "idle"
   });
+  const [pendingSnapshotArchiveImport, setPendingSnapshotArchiveImport] = useState<PendingSnapshotArchiveImport>();
   const [adminAuth, setAdminAuth] = useState<AdminAuthState>({
     authenticated: false,
     configured: false,
@@ -853,14 +870,69 @@ export default function Home() {
     if (!file) return;
 
     setSnapshotCaptureState({
-      message: "Importing archive",
+      message: "Validating archive",
       status: "testing"
     });
 
     try {
       const parsed = JSON.parse(await file.text()) as unknown;
-      const response = await fetch("/api/snapshot-history/import", {
+      const response = await fetch("/api/snapshot-history/import?dryRun=true", {
         body: JSON.stringify(parsed),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        limits?: unknown;
+        summary?: unknown;
+      };
+      if (!response.ok || !isSnapshotArchiveImportSummary(payload.summary)) {
+        throw new Error(payload.error ?? "Snapshot archive import failed");
+      }
+
+      if (isSnapshotStorageLimits(payload.limits)) {
+        setSnapshotStorageLimits(payload.limits);
+      }
+      setPendingSnapshotArchiveImport({
+        archive: parsed,
+        fileName: file.name,
+        summary: payload.summary
+      });
+      setSnapshotCaptureState({
+        message: `Previewed ${payload.summary.importableCaptures} captures`,
+        status: "success",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Snapshot archive ready to import");
+      addActivity(setActivity, "Previewed snapshot archive");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Snapshot archive import failed";
+      setSnapshotCaptureState({
+        message,
+        status: "error",
+        testedAt: new Date().toISOString()
+      });
+      setNotice("Snapshot archive import failed");
+    } finally {
+      if (snapshotArchiveImportRef.current) {
+        snapshotArchiveImportRef.current.value = "";
+      }
+    }
+  };
+
+  const confirmSnapshotArchiveImport = async () => {
+    if (!pendingSnapshotArchiveImport) return;
+
+    setSnapshotCaptureState({
+      message: "Importing archive",
+      status: "testing"
+    });
+
+    try {
+      const response = await fetch("/api/snapshot-history/import", {
+        body: JSON.stringify(pendingSnapshotArchiveImport.archive),
         headers: {
           "Content-Type": "application/json"
         },
@@ -873,6 +945,7 @@ export default function Home() {
         importedCaptures?: number;
         importedEntries?: number;
         limits?: unknown;
+        summary?: unknown;
       };
       if (!response.ok || !Array.isArray(payload.entries)) {
         throw new Error(payload.error ?? "Snapshot archive import failed");
@@ -887,6 +960,7 @@ export default function Home() {
       setSelectedSnapshotCapture(undefined);
       setSelectedSnapshotCaptureId("");
       setSnapshotReviewNoteDraft("");
+      setPendingSnapshotArchiveImport(undefined);
       setSnapshotCaptureState({
         message: `Imported ${payload.importedCaptures ?? 0} captures`,
         status: "success",
@@ -902,10 +976,6 @@ export default function Home() {
         testedAt: new Date().toISOString()
       });
       setNotice("Snapshot archive import failed");
-    } finally {
-      if (snapshotArchiveImportRef.current) {
-        snapshotArchiveImportRef.current.value = "";
-      }
     }
   };
 
@@ -1517,8 +1587,10 @@ export default function Home() {
             onExportSnapshotReviewPolicy={exportSnapshotReviewPolicy}
             onExportSnapshotReviewQueueReport={exportSnapshotReviewQueueReport}
             onExportSnapshotTrendReport={exportSnapshotTrendReport}
+            onConfirmSnapshotArchiveImport={confirmSnapshotArchiveImport}
             onImportSnapshotArchive={importSnapshotArchive}
             onImportSnapshotReviewPolicy={importSnapshotReviewPolicy}
+            onCancelSnapshotArchiveImport={() => setPendingSnapshotArchiveImport(undefined)}
             onLoadSnapshotCapture={loadSnapshotCapture}
             onMarkVisibleSnapshotQueueReviewed={markVisibleSnapshotQueueReviewed}
             onOpenSnapshotArchiveImport={() => snapshotArchiveImportRef.current?.click()}
@@ -1530,6 +1602,7 @@ export default function Home() {
             onUpdateSnapshotReviewPolicy={updateSnapshotReviewPolicy}
             onUseSelectedSnapshotCapture={useSelectedSnapshotCapture}
             persistedSnapshotCaptureIds={persistedSnapshotCaptureIds}
+            pendingSnapshotArchiveImport={pendingSnapshotArchiveImport}
             reviewQueueUpdating={reviewQueueUpdating}
             selectedSnapshotComparison={selectedSnapshotComparison}
             selectedSnapshotCapture={selectedSnapshotCapture}
@@ -1817,6 +1890,8 @@ function UsageView({
   onExportSnapshotReviewPolicy,
   onExportSnapshotReviewQueueReport,
   onExportSnapshotTrendReport,
+  onCancelSnapshotArchiveImport,
+  onConfirmSnapshotArchiveImport,
   onImportSnapshotArchive,
   onImportSnapshotReviewPolicy,
   onLoadSnapshotCapture,
@@ -1829,6 +1904,7 @@ function UsageView({
   onUpdateSnapshotReview,
   onUpdateSnapshotReviewPolicy,
   onUseSelectedSnapshotCapture,
+  pendingSnapshotArchiveImport,
   persistedSnapshotCaptureIds,
   reviewQueueUpdating,
   selectedSnapshotComparison,
@@ -1855,6 +1931,8 @@ function UsageView({
     severityFilter: SnapshotReviewQueueSeverityFilter
   ) => void;
   onExportSnapshotTrendReport: (sourceFilter: SnapshotHistorySourceFilter) => void;
+  onCancelSnapshotArchiveImport: () => void;
+  onConfirmSnapshotArchiveImport: () => void;
   onImportSnapshotArchive: (file?: File | null) => void;
   onImportSnapshotReviewPolicy: (file?: File | null) => void;
   onLoadSnapshotCapture: (entryId: string, compareToId?: string) => void;
@@ -1867,6 +1945,7 @@ function UsageView({
   onUpdateSnapshotReview: (reviewed?: boolean) => void;
   onUpdateSnapshotReviewPolicy: (policy: SnapshotReviewPolicy) => void;
   onUseSelectedSnapshotCapture: () => void;
+  pendingSnapshotArchiveImport?: PendingSnapshotArchiveImport;
   persistedSnapshotCaptureIds: string[];
   reviewQueueUpdating: boolean;
   selectedSnapshotComparison?: SnapshotCaptureComparison;
@@ -1991,7 +2070,10 @@ function UsageView({
           filter={historySourceFilter}
           filterCounts={snapshotHistoryCounts}
           importInputRef={snapshotArchiveImportRef}
+          importPreview={pendingSnapshotArchiveImport}
+          onCancelImport={onCancelSnapshotArchiveImport}
           onClear={onClearSnapshotHistory}
+          onConfirmImport={onConfirmSnapshotArchiveImport}
           onExportArchive={() => onExportSnapshotArchive(historySourceFilter)}
           onFilterChange={setHistorySourceFilter}
           onImportArchive={onImportSnapshotArchive}
@@ -2578,7 +2660,10 @@ function SnapshotHistoryPanel({
   filter,
   filterCounts,
   importInputRef,
+  importPreview,
+  onCancelImport,
   onClear,
+  onConfirmImport,
   onExportArchive,
   onFilterChange,
   onImportArchive,
@@ -2594,7 +2679,10 @@ function SnapshotHistoryPanel({
   filter: SnapshotHistorySourceFilter;
   filterCounts: Record<SnapshotHistorySourceFilter, number>;
   importInputRef: RefObject<HTMLInputElement>;
+  importPreview?: PendingSnapshotArchiveImport;
+  onCancelImport: () => void;
   onClear: () => void;
+  onConfirmImport: () => void;
   onExportArchive: () => void;
   onFilterChange: (filter: SnapshotHistorySourceFilter) => void;
   onImportArchive: (file?: File | null) => void;
@@ -2653,6 +2741,14 @@ function SnapshotHistoryPanel({
           </button>
         ))}
       </div>
+      {importPreview ? (
+        <SnapshotArchiveImportPreview
+          onCancel={onCancelImport}
+          onConfirm={onConfirmImport}
+          preview={importPreview}
+          storageLimits={storageLimits}
+        />
+      ) : null}
       <div className="list">
         {visibleEntries.length ? visibleEntries.map((entry, index) => {
           const previous = entries[index + 1];
@@ -2688,6 +2784,54 @@ function SnapshotHistoryPanel({
             <p>No captures for this source.</p>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function SnapshotArchiveImportPreview({
+  onCancel,
+  onConfirm,
+  preview,
+  storageLimits
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+  preview: PendingSnapshotArchiveImport;
+  storageLimits: SnapshotStorageLimits;
+}) {
+  const sourceRows = Object.entries(preview.summary.sourceCounts).sort(([a], [b]) => a.localeCompare(b));
+  const skippedRows = preview.summary.invalidCaptures + preview.summary.invalidEntries;
+  const duplicateRows = preview.summary.duplicateCaptures + preview.summary.duplicateEntries;
+
+  return (
+    <div className="archive-import-preview">
+      <div>
+        <strong className="truncate">{preview.fileName}</strong>
+        <span>
+          {preview.summary.importableCaptures} captures · {preview.summary.importableEntries} rows
+        </span>
+      </div>
+      <div className="archive-import-metrics">
+        <span>{preview.summary.retainedCapturesAfterImport} / {storageLimits.captureLimit} captures retained</span>
+        <span>{preview.summary.retainedEntriesAfterImport} / {storageLimits.historyLimit} rows retained</span>
+        <span>{duplicateRows} duplicate</span>
+        <span>{skippedRows} skipped</span>
+      </div>
+      {sourceRows.length ? (
+        <div className="archive-import-sources">
+          {sourceRows.map(([source, count]) => (
+            <span key={source}>{formatDeviceSourceLabel(source as DeviceSnapshotSource)} {count}</span>
+          ))}
+        </div>
+      ) : null}
+      <div className="archive-import-actions">
+        <button className="text-button slim" onClick={onCancel} type="button">
+          Cancel
+        </button>
+        <button className="text-button slim primary" onClick={onConfirm} type="button">
+          Confirm Import
+        </button>
       </div>
     </div>
   );
@@ -3892,6 +4036,31 @@ function isSnapshotStorageLimits(value: unknown): value is SnapshotStorageLimits
     Number.isFinite(limits.captureLimit) &&
     typeof limits.historyLimit === "number" &&
     Number.isFinite(limits.historyLimit)
+  );
+}
+
+function isSnapshotArchiveImportSummary(value: unknown): value is SnapshotArchiveImportSummary {
+  if (!value || typeof value !== "object") return false;
+  const summary = value as Partial<SnapshotArchiveImportSummary>;
+  return (
+    typeof summary.duplicateCaptures === "number" &&
+    Number.isFinite(summary.duplicateCaptures) &&
+    typeof summary.duplicateEntries === "number" &&
+    Number.isFinite(summary.duplicateEntries) &&
+    typeof summary.importableCaptures === "number" &&
+    Number.isFinite(summary.importableCaptures) &&
+    typeof summary.importableEntries === "number" &&
+    Number.isFinite(summary.importableEntries) &&
+    typeof summary.invalidCaptures === "number" &&
+    Number.isFinite(summary.invalidCaptures) &&
+    typeof summary.invalidEntries === "number" &&
+    Number.isFinite(summary.invalidEntries) &&
+    typeof summary.retainedCapturesAfterImport === "number" &&
+    Number.isFinite(summary.retainedCapturesAfterImport) &&
+    typeof summary.retainedEntriesAfterImport === "number" &&
+    Number.isFinite(summary.retainedEntriesAfterImport) &&
+    Boolean(summary.sourceCounts) &&
+    typeof summary.sourceCounts === "object"
   );
 }
 

@@ -20,6 +20,18 @@ export type SnapshotHistoryLimits = {
   historyLimit: number;
 };
 
+export type SnapshotArchiveImportSummary = {
+  duplicateCaptures: number;
+  duplicateEntries: number;
+  importableCaptures: number;
+  importableEntries: number;
+  invalidCaptures: number;
+  invalidEntries: number;
+  retainedCapturesAfterImport: number;
+  retainedEntriesAfterImport: number;
+  sourceCounts: Record<string, number>;
+};
+
 type SnapshotHistoryFile = {
   captures: SnapshotCaptureRecord[];
   entries: SnapshotHistoryEntry[];
@@ -208,21 +220,62 @@ export async function deleteSnapshotCapture(
 export async function importSnapshotArchive(
   archive: { captures?: unknown; entries?: unknown },
   env: NodeJS.ProcessEnv = process.env
-): Promise<{ captures: SnapshotCaptureRecord[]; entries: SnapshotHistoryEntry[]; importedCaptures: number; importedEntries: number }> {
-  const importedCaptures = Array.isArray(archive.captures) ? archive.captures.filter(isSnapshotCaptureRecord) : [];
-  const importedEntries = Array.isArray(archive.entries) ? archive.entries.filter(isSnapshotHistoryEntry) : [];
+): Promise<{
+  captures: SnapshotCaptureRecord[];
+  entries: SnapshotHistoryEntry[];
+  importedCaptures: number;
+  importedEntries: number;
+  summary: SnapshotArchiveImportSummary;
+}> {
+  const preview = await previewSnapshotArchiveImport(archive, env);
 
-  if (importedCaptures.length === 0 && importedEntries.length === 0) {
+  if (preview.importedCaptures.length === 0 && preview.importedEntries.length === 0) {
     return {
       captures: await readSnapshotCaptures(env),
       entries: await readSnapshotHistory(env),
       importedCaptures: 0,
-      importedEntries: 0
+      importedEntries: 0,
+      summary: preview.summary
     };
   }
 
+  await writeSnapshotHistoryFile({ captures: preview.nextCaptures, entries: preview.nextEntries }, env);
+
+  return {
+    captures: preview.nextCaptures,
+    entries: preview.nextEntries,
+    importedCaptures: preview.importedCaptures.length,
+    importedEntries: preview.importedEntries.length,
+    summary: preview.summary
+  };
+}
+
+export async function validateSnapshotArchiveImport(
+  archive: { captures?: unknown; entries?: unknown },
+  env: NodeJS.ProcessEnv = process.env
+): Promise<SnapshotArchiveImportSummary> {
+  return (await previewSnapshotArchiveImport(archive, env)).summary;
+}
+
+export function getSnapshotHistoryLimits(env: NodeJS.ProcessEnv = process.env): SnapshotHistoryLimits {
+  return {
+    captureLimit: parseBoundedLimit(env.WHOFI_SNAPSHOT_CAPTURE_LIMIT, defaultCaptureLimit, maxCaptureLimit),
+    historyLimit: parseBoundedLimit(env.WHOFI_SNAPSHOT_HISTORY_LIMIT, defaultHistoryLimit, maxHistoryLimit)
+  };
+}
+
+async function previewSnapshotArchiveImport(
+  archive: { captures?: unknown; entries?: unknown },
+  env: NodeJS.ProcessEnv
+) {
+  const captureCandidates = Array.isArray(archive.captures) ? archive.captures : [];
+  const entryCandidates = Array.isArray(archive.entries) ? archive.entries : [];
+  const importedCaptures = captureCandidates.filter(isSnapshotCaptureRecord);
+  const importedEntries = entryCandidates.filter(isSnapshotHistoryEntry);
   const current = await readSnapshotHistoryFile(env);
   const limits = getSnapshotHistoryLimits(env);
+  const currentCaptureIds = new Set(current.captures.map((capture) => capture.id));
+  const currentEntryKeys = new Set(current.entries.map(getHistoryEntryDedupeKey));
   const nextCaptures = dedupeCaptures([...importedCaptures, ...current.captures])
     .sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime())
     .slice(0, limits.captureLimit);
@@ -234,20 +287,22 @@ export async function importSnapshotArchive(
     .sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime())
     .slice(0, limits.historyLimit);
 
-  await writeSnapshotHistoryFile({ captures: nextCaptures, entries: nextEntries }, env);
-
   return {
-    captures: nextCaptures,
-    entries: nextEntries,
-    importedCaptures: importedCaptures.length,
-    importedEntries: importedEntries.length
-  };
-}
-
-export function getSnapshotHistoryLimits(env: NodeJS.ProcessEnv = process.env): SnapshotHistoryLimits {
-  return {
-    captureLimit: parseBoundedLimit(env.WHOFI_SNAPSHOT_CAPTURE_LIMIT, defaultCaptureLimit, maxCaptureLimit),
-    historyLimit: parseBoundedLimit(env.WHOFI_SNAPSHOT_HISTORY_LIMIT, defaultHistoryLimit, maxHistoryLimit)
+    importedCaptures,
+    importedEntries,
+    nextCaptures,
+    nextEntries,
+    summary: {
+      duplicateCaptures: importedCaptures.filter((capture) => currentCaptureIds.has(capture.id)).length,
+      duplicateEntries: importedEntries.filter((entry) => currentEntryKeys.has(getHistoryEntryDedupeKey(entry))).length,
+      importableCaptures: importedCaptures.length,
+      importableEntries: importedEntries.length,
+      invalidCaptures: captureCandidates.length - importedCaptures.length,
+      invalidEntries: entryCandidates.length - importedEntries.length,
+      retainedCapturesAfterImport: nextCaptures.length,
+      retainedEntriesAfterImport: nextEntries.length,
+      sourceCounts: countArchiveSources(importedCaptures, importedEntries)
+    } satisfies SnapshotArchiveImportSummary
   };
 }
 
@@ -282,11 +337,15 @@ async function writeSnapshotHistoryFile(file: SnapshotHistoryFile, env: NodeJS.P
 function dedupeHistoryEntries(entries: SnapshotHistoryEntry[]) {
   const seen = new Set<string>();
   return entries.filter((entry) => {
-    const key = `${entry.source}:${entry.observedAt}`;
+    const key = getHistoryEntryDedupeKey(entry);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+}
+
+function getHistoryEntryDedupeKey(entry: SnapshotHistoryEntry) {
+  return `${entry.source}:${entry.observedAt}`;
 }
 
 function dedupeCaptures(captures: SnapshotCaptureRecord[]) {
@@ -338,6 +397,14 @@ function isSnapshotHistoryEntry(value: unknown): value is SnapshotHistoryEntry {
       typeof entry.totalBytes === "number" &&
       typeof entry.unknownDevices === "number"
   );
+}
+
+function countArchiveSources(captures: SnapshotCaptureRecord[], entries: SnapshotHistoryEntry[]) {
+  const counts: Record<string, number> = {};
+  for (const entry of [...entries, ...captures.map((capture) => capture.summary)]) {
+    counts[entry.source] = (counts[entry.source] ?? 0) + 1;
+  }
+  return counts;
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {

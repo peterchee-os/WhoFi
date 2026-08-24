@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuthStatus } from "@/lib/admin-auth";
-import { getSnapshotHistoryLimits, importSnapshotArchive } from "@/lib/snapshot-history-store";
+import {
+  getSnapshotHistoryLimits,
+  importSnapshotArchive,
+  validateSnapshotArchiveImport
+} from "@/lib/snapshot-history-store";
 
 export const runtime = "nodejs";
 
@@ -31,14 +35,39 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const result = await importSnapshotArchive(body);
-  if (result.importedCaptures === 0 && result.importedEntries === 0) {
+  const dryRun = request.nextUrl.searchParams.get("dryRun") === "true";
+  const summary = dryRun ? await validateSnapshotArchiveImport(body) : undefined;
+  const result = dryRun ? undefined : await importSnapshotArchive(body);
+  const importableCaptures = summary?.importableCaptures ?? result?.importedCaptures ?? 0;
+  const importableEntries = summary?.importableEntries ?? result?.importedEntries ?? 0;
+
+  if (importableCaptures === 0 && importableEntries === 0) {
     return NextResponse.json(
       {
-        error: "Snapshot archive has no importable captures or entries"
+        error: "Snapshot archive has no importable captures or entries",
+        summary
       },
       {
         status: 400
+      }
+    );
+  }
+
+  if (dryRun) {
+    return NextResponse.json({
+      dryRun: true,
+      limits: getSnapshotHistoryLimits(),
+      summary
+    });
+  }
+
+  if (!result) {
+    return NextResponse.json(
+      {
+        error: "Snapshot archive import failed"
+      },
+      {
+        status: 500
       }
     );
   }
