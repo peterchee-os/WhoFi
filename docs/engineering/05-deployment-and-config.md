@@ -208,6 +208,7 @@ Current implementation state:
 - `WHOFI_REQUIRE_ADMIN_AUTH=true` enables app-level admin sign-in before the dashboard and API-level auth checks around live/provider routes.
 - `WHOFI_SNAPSHOT_HISTORY_PATH` can override the default local history file path, `.whofi/snapshot-history.json`.
 - `WHOFI_SNAPSHOT_REVIEW_POLICY_PATH` can override the default local review policy file path, `.whofi/snapshot-review-policy.json`.
+- `WHOFI_SNAPSHOT_CAPTURE_LIMIT` defaults to `25` and caps bounded full captures at `250`; `WHOFI_SNAPSHOT_HISTORY_LIMIT` defaults to `100` and caps summary rows at `1000`.
 - `WHOFI_ENABLE_LIVE_DEVICE_SOURCES=true` is required before `/api/devices?source=omada` or `source=omada-pp` returns live network rows. Keep it false for public demos and unauthenticated deployments.
 - `WHOFI_LIVE_DEVICE_SOURCE_TOKEN` adds a lightweight admin token check for live snapshot requests. When set, requests must include `X-WhoFi-Live-Source-Token`.
 - `WHOFI_VERIFICATION_CLIENT_MAC` can configure one known device or AP/BSSID as a live-source smoke-test anchor; set `WHOFI_VERIFICATION_ANCHOR_KIND=client` or `access_point`. API responses report only whether the anchor is present, never the configured MAC value.

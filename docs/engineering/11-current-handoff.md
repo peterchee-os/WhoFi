@@ -14,8 +14,8 @@ Latest completed slices:
 - search across device, owner, profile, and network fields
 - device inspection panel
 - dashboard source switcher for Demo, Omada, and optional Omada Printing Press CLI snapshots
-- Usage view with current snapshot totals, source-filtered recent history, source-filtered JSON archive export/import, snapshot trend metrics and Markdown trend reports, tunable/exportable/importable review policy thresholds, open capture review queue with workload counts, stored capture detail, selected-capture JSON/Markdown export, stored-capture replay, review notes, reviewed state, single-capture deletion, previous-capture deltas, new/missing device movement, generated review-signal hints, and rollups by location, SSID, and AP
-- local file-backed snapshot audit history at `.whofi/snapshot-history.json`, with bounded full captures and `WHOFI_SNAPSHOT_HISTORY_PATH` override
+- Usage view with current snapshot totals, source-filtered recent history, local retention counts, source-filtered JSON archive export/import, snapshot trend metrics and Markdown trend reports, tunable/exportable/importable review policy thresholds, open capture review queue with workload counts, stored capture detail, selected-capture JSON/Markdown export, stored-capture replay, review notes, reviewed state, single-capture deletion, previous-capture deltas, new/missing device movement, generated review-signal hints, and rollups by location, SSID, and AP
+- local file-backed snapshot audit history at `.whofi/snapshot-history.json`, with configurable bounded full captures and `WHOFI_SNAPSHOT_HISTORY_PATH` override
 - local file-backed snapshot review policy at `.whofi/snapshot-review-policy.json`, with `WHOFI_SNAPSHOT_REVIEW_POLICY_PATH` override
 - local review actions: assign, reviewed, watch, block
 - local alert actions: acknowledge, resolve
@@ -30,6 +30,7 @@ Latest completed slices:
 - `POST /api/snapshot-history/capture` endpoint for write/capture semantics; `/api/devices` remains read-only
 - `GET /api/snapshot-history/export` endpoint for source-filtered JSON archives of local snapshot audit state
 - `POST /api/snapshot-history/import` endpoint for merging JSON archives back into bounded local snapshot audit history
+- `WHOFI_SNAPSHOT_CAPTURE_LIMIT` and `WHOFI_SNAPSHOT_HISTORY_LIMIT` env knobs for local retention ceilings
 - `GET /api/snapshot-history/trends` endpoint for stored capture trend summaries and recent points
 - `GET /api/snapshot-history/trends/report` endpoint for filtered Markdown trend reports
 - `GET /api/snapshot-history/review-queue` endpoint for open stored capture reviews and queue summary counts

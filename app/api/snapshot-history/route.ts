@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuthStatus } from "@/lib/admin-auth";
-import { clearSnapshotHistory, readSnapshotCaptures, readSnapshotHistory } from "@/lib/snapshot-history-store";
+import {
+  clearSnapshotHistory,
+  getSnapshotHistoryLimits,
+  readSnapshotCaptures,
+  readSnapshotHistory
+} from "@/lib/snapshot-history-store";
 
 export const runtime = "nodejs";
 
@@ -22,7 +27,8 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     captures: includeCaptures ? await readSnapshotCaptures() : undefined,
-    entries
+    entries,
+    limits: getSnapshotHistoryLimits()
   });
 }
 
@@ -41,6 +47,7 @@ export async function DELETE(request: NextRequest) {
 
   await clearSnapshotHistory();
   return NextResponse.json({
-    entries: []
+    entries: [],
+    limits: getSnapshotHistoryLimits()
   });
 }

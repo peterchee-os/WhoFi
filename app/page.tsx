@@ -48,6 +48,10 @@ type View = "dashboard" | "devices" | "usage" | "profiles" | "alerts" | "setting
 type DeviceSnapshotSource = "demo" | "omada" | "omada-pp";
 type SnapshotHistorySourceFilter = "all" | DeviceSnapshotSource;
 type SnapshotReviewQueueSeverityFilter = "all" | SnapshotReviewQueueItem["severity"];
+type SnapshotStorageLimits = {
+  captureLimit: number;
+  historyLimit: number;
+};
 type NotificationProviderMode = "disabled" | "console" | "resend";
 type EmailDeliveryStatus = "sent" | "failed" | "disabled" | "rendered";
 type NotificationRuleKey =
@@ -326,6 +330,10 @@ export default function Home() {
   const [riskOverrides, setRiskOverrides] = useState<Record<string, RiskState>>({});
   const [alertStatusOverrides, setAlertStatusOverrides] = useState<Record<string, AlertStatus>>({});
   const [snapshotHistory, setSnapshotHistory] = useState<SnapshotHistoryEntry[]>([]);
+  const [snapshotStorageLimits, setSnapshotStorageLimits] = useState<SnapshotStorageLimits>({
+    captureLimit: 25,
+    historyLimit: 100
+  });
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [notice, setNotice] = useState("Ready");
@@ -481,6 +489,9 @@ export default function Home() {
       .then((response) => response.json())
       .then((payload) => {
         if (cancelled || !Array.isArray(payload.entries)) return;
+        if (isSnapshotStorageLimits(payload.limits)) {
+          setSnapshotStorageLimits(payload.limits);
+        }
         setPersistedSnapshotCaptureIds(payload.entries.map((entry: SnapshotHistoryEntry) => entry.id));
         setSnapshotHistory((current) => payload.entries.length
           ? mergeSnapshotHistory(payload.entries).slice(0, 10)
@@ -593,6 +604,10 @@ export default function Home() {
     try {
       const response = await fetch("/api/snapshot-history", { method: "DELETE" });
       if (!response.ok) throw new Error("History clear failed");
+      const payload = (await response.json().catch(() => undefined)) as { limits?: unknown } | undefined;
+      if (isSnapshotStorageLimits(payload?.limits)) {
+        setSnapshotStorageLimits(payload.limits);
+      }
       setPersistedSnapshotCaptureIds([]);
       setSnapshotHistory([]);
       setSelectedSnapshotComparison(undefined);
@@ -804,11 +819,15 @@ export default function Home() {
         error?: string;
         importedCaptures?: number;
         importedEntries?: number;
+        limits?: unknown;
       };
       if (!response.ok || !Array.isArray(payload.entries)) {
         throw new Error(payload.error ?? "Snapshot archive import failed");
       }
 
+      if (isSnapshotStorageLimits(payload.limits)) {
+        setSnapshotStorageLimits(payload.limits);
+      }
       setPersistedSnapshotCaptureIds((payload.captures ?? []).map((capture) => capture.id));
       setSnapshotHistory(mergeSnapshotHistory(payload.entries).slice(0, 10));
       setSelectedSnapshotComparison(undefined);
@@ -1146,6 +1165,7 @@ export default function Home() {
       const payload = (await response.json()) as {
         devices?: Device[];
         error?: string;
+        limits?: unknown;
         observedAt?: string;
         snapshotHistory?: SnapshotHistoryEntry[];
         source?: DeviceSnapshotSource;
@@ -1160,6 +1180,9 @@ export default function Home() {
       setSelectedDeviceId(payload.devices[0]?.id ?? "");
       const observedAt = payload.observedAt ?? new Date().toISOString();
       setSnapshotObservedAt(observedAt);
+      if (isSnapshotStorageLimits(payload.limits)) {
+        setSnapshotStorageLimits(payload.limits);
+      }
       if (payload.snapshotHistory?.length) {
         setPersistedSnapshotCaptureIds(payload.snapshotHistory.map((entry) => entry.id));
         setSnapshotHistory((current) => mergeSnapshotHistory(payload.snapshotHistory ?? [], current).slice(0, 10));
@@ -1464,6 +1487,7 @@ export default function Home() {
             snapshotReviewPolicyImportRef={snapshotReviewPolicyImportRef}
             snapshotReviewPolicyState={snapshotReviewPolicyState}
             snapshotReviewNoteDraft={snapshotReviewNoteDraft}
+            snapshotStorageLimits={snapshotStorageLimits}
           />
         ) : null}
         {activeView === "profiles" ? <ProfilesView profiles={demoProfiles} /> : null}
@@ -1761,7 +1785,8 @@ function UsageView({
   snapshotReviewPolicy,
   snapshotReviewPolicyImportRef,
   snapshotReviewPolicyState,
-  snapshotReviewNoteDraft
+  snapshotReviewNoteDraft,
+  snapshotStorageLimits
 }: {
   onClearSnapshotHistory: () => void;
   onDeleteSelectedSnapshotCapture: () => void;
@@ -1798,6 +1823,7 @@ function UsageView({
   snapshotReviewPolicyImportRef: RefObject<HTMLInputElement>;
   snapshotReviewPolicyState: IntegrationTestState;
   snapshotReviewNoteDraft: string;
+  snapshotStorageLimits: SnapshotStorageLimits;
 }) {
   const [historySourceFilter, setHistorySourceFilter] = useState<SnapshotHistorySourceFilter>("all");
   const [reviewQueueSourceFilter, setReviewQueueSourceFilter] = useState<SnapshotHistorySourceFilter>("all");
@@ -1907,6 +1933,7 @@ function UsageView({
           onLoadCapture={onLoadSnapshotCapture}
           persistedEntryIds={persistedSnapshotCaptureIds}
           selectedEntryId={selectedSnapshotCaptureId}
+          storageLimits={snapshotStorageLimits}
           totalCount={snapshotHistory.length}
         />
       </div>
@@ -2471,6 +2498,7 @@ function SnapshotHistoryPanel({
   onLoadCapture,
   persistedEntryIds,
   selectedEntryId,
+  storageLimits,
   totalCount
 }: {
   entries: SnapshotHistoryEntry[];
@@ -2485,6 +2513,7 @@ function SnapshotHistoryPanel({
   onLoadCapture: (entryId: string) => void;
   persistedEntryIds: string[];
   selectedEntryId: string;
+  storageLimits: SnapshotStorageLimits;
   totalCount: number;
 }) {
   const visibleEntries = entries.slice(0, 8);
@@ -2497,6 +2526,7 @@ function SnapshotHistoryPanel({
         <div>
           <h3>Snapshot History</h3>
           <p>{visibleEntries.length} of {totalCount} recent captures.</p>
+          <p>{persistedEntryIds.length} / {storageLimits.captureLimit} stored captures · {totalCount} / {storageLimits.historyLimit} retained rows.</p>
         </div>
         <div className="panel-actions">
           <button className="text-button slim" disabled={entries.length === 0} onClick={onExportArchive}>
@@ -3759,6 +3789,17 @@ function getDeviceSourceTitle(source: DeviceSnapshotSource, liveSourceAccess: Li
   if (!liveSourceAccess.loaded) return "Checking live source access";
   if (!liveSourceAccess.enabled) return "Live snapshots disabled";
   return `Capture ${formatDeviceSourceLabel(source)} devices`;
+}
+
+function isSnapshotStorageLimits(value: unknown): value is SnapshotStorageLimits {
+  if (!value || typeof value !== "object") return false;
+  const limits = value as Partial<SnapshotStorageLimits>;
+  return (
+    typeof limits.captureLimit === "number" &&
+    Number.isFinite(limits.captureLimit) &&
+    typeof limits.historyLimit === "number" &&
+    Number.isFinite(limits.historyLimit)
+  );
 }
 
 function getImportedSnapshotReviewPolicy(value: unknown): SnapshotReviewPolicy | undefined {

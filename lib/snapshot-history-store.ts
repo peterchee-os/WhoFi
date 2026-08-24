@@ -12,6 +12,13 @@ import {
 
 const defaultCaptureLimit = 25;
 const defaultHistoryLimit = 100;
+const maxCaptureLimit = 250;
+const maxHistoryLimit = 1000;
+
+export type SnapshotHistoryLimits = {
+  captureLimit: number;
+  historyLimit: number;
+};
 
 type SnapshotHistoryFile = {
   captures: SnapshotCaptureRecord[];
@@ -24,6 +31,7 @@ export async function appendSnapshotHistory(
 ): Promise<SnapshotHistoryEntry[]> {
   const entry = createSnapshotHistoryEntry(snapshot.source, snapshot.devices, snapshot.observedAt);
   const current = await readSnapshotHistoryFile(env);
+  const limits = getSnapshotHistoryLimits(env);
   const capture: SnapshotCaptureRecord = {
     capturedAt: new Date().toISOString(),
     deviceSnapshot: snapshot,
@@ -32,8 +40,8 @@ export async function appendSnapshotHistory(
     summary: entry
   };
   const nextFile: SnapshotHistoryFile = {
-    captures: dedupeCaptures([capture, ...current.captures]).slice(0, defaultCaptureLimit),
-    entries: dedupeHistoryEntries([entry, ...current.entries]).slice(0, defaultHistoryLimit)
+    captures: dedupeCaptures([capture, ...current.captures]).slice(0, limits.captureLimit),
+    entries: dedupeHistoryEntries([entry, ...current.entries]).slice(0, limits.historyLimit)
   };
   await writeSnapshotHistoryFile(nextFile, env);
   return nextFile.entries;
@@ -185,16 +193,17 @@ export async function importSnapshotArchive(
   }
 
   const current = await readSnapshotHistoryFile(env);
+  const limits = getSnapshotHistoryLimits(env);
   const nextCaptures = dedupeCaptures([...importedCaptures, ...current.captures])
     .sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime())
-    .slice(0, defaultCaptureLimit);
+    .slice(0, limits.captureLimit);
   const nextEntries = dedupeHistoryEntries([
     ...importedEntries,
     ...importedCaptures.map((capture) => capture.summary),
     ...current.entries
   ])
     .sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime())
-    .slice(0, defaultHistoryLimit);
+    .slice(0, limits.historyLimit);
 
   await writeSnapshotHistoryFile({ captures: nextCaptures, entries: nextEntries }, env);
 
@@ -203,6 +212,13 @@ export async function importSnapshotArchive(
     entries: nextEntries,
     importedCaptures: importedCaptures.length,
     importedEntries: importedEntries.length
+  };
+}
+
+export function getSnapshotHistoryLimits(env: NodeJS.ProcessEnv = process.env): SnapshotHistoryLimits {
+  return {
+    captureLimit: parseBoundedLimit(env.WHOFI_SNAPSHOT_CAPTURE_LIMIT, defaultCaptureLimit, maxCaptureLimit),
+    historyLimit: parseBoundedLimit(env.WHOFI_SNAPSHOT_HISTORY_LIMIT, defaultHistoryLimit, maxHistoryLimit)
   };
 }
 
@@ -297,4 +313,10 @@ function isSnapshotHistoryEntry(value: unknown): value is SnapshotHistoryEntry {
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
+}
+
+function parseBoundedLimit(value: string | undefined, fallback: number, max: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return Math.min(max, Math.floor(parsed));
 }

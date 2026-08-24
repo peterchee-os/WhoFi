@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuthStatus } from "@/lib/admin-auth";
-import { importSnapshotArchive } from "@/lib/snapshot-history-store";
+import { getSnapshotHistoryLimits, importSnapshotArchive } from "@/lib/snapshot-history-store";
 
 export const runtime = "nodejs";
 
@@ -43,7 +43,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json(result);
+  return NextResponse.json({
+    ...result,
+    limits: getSnapshotHistoryLimits()
+  });
 }
 
 function isValidArchivePayload(value: { captures?: unknown; entries?: unknown; schema?: unknown }) {

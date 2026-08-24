@@ -6,7 +6,7 @@ import {
   readDeviceSource,
   redactDeviceSourceError
 } from "@/lib/device-snapshots";
-import { appendSnapshotHistory } from "@/lib/snapshot-history-store";
+import { appendSnapshotHistory, getSnapshotHistoryLimits } from "@/lib/snapshot-history-store";
 
 export const runtime = "nodejs";
 
@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
     const snapshot = await loadDeviceSnapshot(source);
     const snapshotHistory = await appendSnapshotHistory(snapshot);
     return NextResponse.json({
+      limits: getSnapshotHistoryLimits(),
       ...snapshot,
       snapshotHistory
     });
